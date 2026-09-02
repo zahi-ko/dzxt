@@ -1,0 +1,35 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+
+# 运行环境缓存与依赖
+.ruff_cache/
+.pytest_cache/
+*.egg-info/
+node_modules/
+
+# 前端构建产物
+web/dist/
+
+# 音频与模型产物（大文件，禁止入库，统一走 scripts/download_models.py）
+data/
+models/
+*.wav
+*.mp3
+*.flac
+*.pth
+*.ckpt
+*.onnx
+*.bin
+*.safetensors
+
+# 本地工具数据（各成员各自持有，入库会互相冲突）
+.workbuddy/
+
+# 编辑器与系统
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

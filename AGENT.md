@@ -1,0 +1,310 @@
+# AGENT.md
+
+语音处理系统设计与实现 · 项目总纲。
+
+**本文件是项目的唯一真相源。** 任何新 session 开工前必须先读完本文件，再动手。
+内容有变化时，改动者负责同步更新，并在文末「变更日志」记一行。
+
+---
+
+## 0. 新 session 开工清单
+
+按顺序做完这五步，再开始写代码：
+
+1. 读本文件全文
+2. 读 `PLAN.md`，定位当前处于哪个阶段、下一个待办是什么
+3. 确认环境可用：`uv run python -c "import server.schemas"`
+4. 打开 `http://127.0.0.1:5173`（前端）与 `http://127.0.0.1:8000/docs`（接口文档）
+5. 收工前回来更新「当前进展」与「变更日志」
+
+---
+
+## 1. 项目概况
+
+| 项 | 内容 |
+|---|---|
+| 题目 | 语音处理系统设计与实现（第 14 组，团队题） |
+| 指导教师 | 张彪 |
+| 成员 | 张翔（组长）、王仁智、叶绍文 |
+| 成果形式 | 软件 |
+| 阶段 | 开题 → 中期 → 结题 |
+
+**任务要求（来自题目表）**
+
+1. 完成语音处理系统软件整体架构设计与实现，系统运行稳定、界面友好
+2. 实现语音信号的采集、处理、显示、播放
+3. 拓展功能（语音识别、语音合成、语音克隆与检测、语音助手等）**至少实现一项**且结果正确可靠
+
+**本项目已确定的拓展范围**
+
+- 必做：语音克隆（本地 GPT-SoVITS）
+- 明确不做：语音识别、语音合成、端点检测、语音助手、深度伪造检测
+
+> 范围一旦要变，先在 `docs/adr/` 补一篇决策记录，再动代码。
+
+---
+
+## 2. 技术栈（已锁定，不要随意更换）
+
+| 层 | 选型 | 说明 |
+|---|---|---|
+| 运行时 | **Python 3.11**（`.python-version` 锁定） | 3.13/3.14 上 PyTorch 系轮子不全 |
+| 环境管理 | **uv** + `pyproject.toml` + `uv.lock` | 跨 session 秒级复现 |
+| Web 框架 | **FastAPI** + Pydantic v2 + uvicorn | 自动 OpenAPI 即接口契约 |
+| 音频 I/O | **sounddevice** + **soundfile** | 采集播放与文件读写 |
+| DSP | **numpy** + **scipy.signal** | 不引入 librosa，算法自行实现便于答辩讲原理 |
+| 前端 | **Vue 3 + Vite**（原生 JS，非 TS） | 组件化 + 响应式，代价仅多一条构建链 |
+| 测试 | pytest | Core 层纯函数优先覆盖 |
+| 代码检查 | ruff | 提交前必跑 |
+
+**语音克隆子服务**（`services/clone/`）：Python 3.11 + PyTorch + GPT-SoVITS，**独立虚拟环境**，通过 HTTP 与主干通信。详见 `docs/adr/0004-voice-clone-local.md`。
+
+---
+
+## 3. 环境与启动
+
+### 3.1 后端
+
+```bash
+uv sync              # 首次或依赖变更后执行
+uv run python -m server.main    # 启动后端，默认 http://127.0.0.1:8000
+```
+
+接口文档自动生成：`http://127.0.0.1:8000/docs`
+
+### 3.2 前端
+
+```bash
+cd web
+npm install          # 首次
+npm run dev          # 开发服务器 http://127.0.0.1:5173
+npm run build        # 产出 web/dist，由后端托管
+```
+
+Vite 已配置代理：前端所有 `/api/*` 请求自动转发到 `127.0.0.1:8000`，因此前端代码里**一律写相对路径 `/api/...`**，不要硬编码端口。
+
+### 3.3 硬件环境
+
+本机为 **NVIDIA RTX 4060 Laptop / 8GB 显存**，满足 GPT-SoVITS 推理需求。
+换机器开发时，先跑 `nvidia-smi` 确认显存是否 ≥ 6GB。
+
+---
+
+## 4. 数据契约（三条铁律）
+
+这三条是所有模块协作的基础，违反会导致隐秘 bug，**任何情况下不得破坏**。
+
+### 铁律一：内部音频表示唯一
+
+模块间传递的音频**一律**是 `(np.ndarray[float32], sample_rate: int)`，值域 `[-1, 1]`。
+
+- 禁止在模块间传递 WAV bytes、base64 字符串
+- 禁止在 Core 层内部做重采样；采样率变化只能发生在 `io/` 层或显式声明的效果里
+- 单声道用一维数组 `(n,)`，多声道用二维 `(n, channels)`
+
+### 铁律二：audio_id 句柄制
+
+音频实体存放在后端 `SessionStore`，API 请求与响应**只传 `audio_id`**，不传波形。
+
+- 好处一：音频再长，接口负载不变
+- 好处二：处理历史天然形成链表，撤销/对比功能直接可用
+- 前端唯一接触音频二进制的场景是导出下载
+
+### 铁律三：效果器注册表
+
+新增处理算法**只写一个文件、一个纯函数**，不允许改动路由、Service 或前端。
+
+```python
+# server/core/effects/my_effect.py
+from pydantic import BaseModel, Field
+import numpy as np
+from server.core.registry import register_effect
+
+class MyParams(BaseModel):
+    amount: float = Field(default=1.0, ge=0.0, le=4.0, description="处理强度")
+
+@register_effect(name="my_effect", title="我的效果", description="一句话说明")
+def my_effect(x: np.ndarray, sr: int, params: MyParams) -> np.ndarray:
+    return x * params.amount
+```
+
+文件放到 `server/core/effects/` 并在该目录 `__init__.py` 中 import 即完成接入。
+参数模型的 JSON Schema 由 `GET /api/effects` 自动下发，前端据此生成表单。
+
+**效果函数必须是纯函数**：相同输入必得相同输出，不碰全局状态、不做 I/O、不改入参。
+
+---
+
+## 5. 目录结构
+
+```
+dzxt/
+├── AGENT.md              本文件
+├── PLAN.md               三阶段里程碑
+├── pyproject.toml        依赖声明
+├── uv.lock               锁定版本，务必入库
+│
+├── server/
+│   ├── main.py           FastAPI 入口
+│   ├── schemas.py        【契约层】Pydantic 模型，唯一接口真相源
+│   ├── session_store.py  audio_id 句柄仓库
+│   ├── api/
+│   │   ├── deps.py       路由公共依赖（句柄 → 404）
+│   │   └── routers/      audio / effects / analysis
+│   └── core/
+│       ├── registry.py   效果器注册表
+│       ├── effects/      处理算法，一个效果一个文件
+│       ├── analysis/     频谱与波形包络
+│       └── io/           录音播放、文件读写
+│
+├── web/
+│   ├── index.html
+│   ├── vite.config.js    /api 代理到 8000
+│   └── src/
+│       ├── main.js
+│       ├── App.vue       状态中枢
+│       ├── api.js        【唯一后端耦合点】
+│       └── components/   采集 / 列表 / 波形 / 频谱 / 效果面板
+│
+├── services/
+│   └── clone/            语音克隆子服务，独立环境（待实现）
+│
+├── docs/
+│   ├── adr/              架构决策记录
+│   └── sessions/         每个 session 的收工日志
+│
+├── tests/                pytest
+└── scripts/              环境与模型下载脚本
+```
+
+---
+
+## 6. 模块归属
+
+**这是默认归属与评审归属，不是排他锁。** 任何人都可以改任何文件，但改了别人主要负责的模块，需在「变更日志」记一行并知会对方。
+
+| 模块 | 主要负责人 | 备注 |
+|---|---|---|
+| `server/schemas.py` | 待分配 | **改动必须全组同步**，这是唯一硬约束 |
+| `server/core/effects/` | 待分配 | 纯算法，最易并行 |
+| `server/core/analysis/` | 待分配 | 频谱、语谱图 |
+| `server/core/io/` | 待分配 | 设备与文件 |
+| `server/api/` | 待分配 | 路由层 |
+| `web/` | 待分配 | Vue 前端 |
+| `services/clone/` | 待分配 | 独立环境，门槛最高 |
+| `docs/` | 组长 | 文档与决策记录 |
+
+> 分工确定后直接改这张表。
+
+---
+
+## 7. API 设计约定
+
+- **REST 负责命令**，路径前缀 `/api`，资源名复数或语义化：`/api/audio`、`/api/effects`、`/api/analysis`
+- **WebSocket 负责实时推送**（录音电平、频谱流），路径 `/ws/...`
+- 所有请求/响应体必须有 Pydantic 模型，**禁止裸 dict**
+- 错误统一返回 `{"detail": "..."}` + 合适状态码
+- 接口优先：先写 schema 与返回 mock 的 router stub，前端即可并行开工，不等后端实现
+
+**前端对称约束**：所有网络请求封在 `web/src/api.js`，Vue 组件不直接调用 `fetch` 或 `axios`。
+
+---
+
+## 8. 协作规范
+
+### 8.1 Git
+
+- `main` 分支为稳定分支，**不直接提交**
+- 开发分支命名：`feat/<模块>-<功能>`，例：`feat/effects-tempo`、`feat/web-waveform`
+- 提交信息：`feat|fix|refactor|docs|test(模块): 简述`
+- 提交前必须：
+
+```bash
+uv run ruff check .
+uv run pytest
+```
+
+- 大文件（模型权重、测试音频）**禁止入库**，一律 `.gitignore` + `scripts/` 下载脚本
+- `uv.lock`、`package-lock.json` 必须入库
+
+### 8.2 评审
+
+- `server/schemas.py` 改动 → 全组同步
+- 其余改动 → 知会对应模块负责人即可
+- 合并到 `main` 前至少一人过目
+
+---
+
+## 9. 跨 session 工作流
+
+**开工**：读 `AGENT.md` → 读 `PLAN.md` → 确认环境 → 动手
+
+**收工**：
+
+1. 更新 `PLAN.md` 中已完成的条目（勾选）
+2. 更新本文件「当前进展」
+3. 在「变更日志」追加一行
+4. 在 `docs/sessions/YYYY-MM-DD-<主题>.md` 写一份日志，包含：
+   - 本次做了什么
+   - 遗留问题与坑
+   - 下一个 session 从哪里接手
+
+第 4 步最关键——它决定了下一个 session 是 5 分钟进入状态，还是半小时考古。
+
+---
+
+## 10. 风险登记
+
+| 风险 | 影响 | 对策 |
+|---|---|---|
+| GPT-SoVITS 环境配置失败 | 结题无法交付拓展功能 | 独立进程 + 独立环境隔离；`TTSProvider` 抽象层保留云端实现插槽（当前不实现，接口留好） |
+| Python 版本漂移 | 依赖装不上 | `.python-version` 锁 3.11，uv 强制 |
+| 模型权重数 GB 污染仓库 | 仓库膨胀、clone 失败 | `.gitignore` + 下载脚本 |
+| 实时性不达标 | 演示卡顿 | 采用文件级处理而非严格流式 |
+| 多人改同一文件冲突 | 合并地狱 | 小步提交 + 频繁 rebase |
+
+---
+
+## 11. 当前进展
+
+**阶段：开题（接口骨架已跑通，待提交）**
+
+已完成：
+
+- [x] 技术栈选型与架构设计（见 `docs/adr/`）
+- [x] 仓库初始化、目录骨架
+- [x] Python 3.11 环境 + 主干依赖安装（uv）
+- [x] 共享契约层 `server/schemas.py`
+- [x] 效果器注册表 `server/core/registry.py`
+- [x] 音频句柄仓库 `server/session_store.py`
+- [x] 基础效果：倒放、增益、倍速（变调/不变调）、归一化
+- [x] 音频 I/O：录音器、播放器、文件读写
+- [x] 频谱分析与波形包络抽取 `server/core/analysis/spectrum.py`
+- [x] 服务入口 `server/main.py` 与三个路由模块（audio / effects / analysis）
+- [x] Vue 3 + Vite 前端工程（录音、列表、波形、频谱、动态效果表单）
+- [x] 测试 27 项全通过，ruff 检查通过
+- [x] 项目文档：AGENT.md、PLAN.md、ADR 0001–0004
+
+待完成：
+
+- [ ] 前后端联调实机验证（需麦克风与扬声器）
+- [ ] 录音电平改用 WebSocket 推送（当前为 300ms 轮询，中期再优化）
+- [ ] 语谱图（STFT 热力图）
+- [ ] `scripts/setup.ps1` 一键环境脚本
+- [ ] `scripts/download_models.py` 模型下载脚本骨架
+- [ ] 首个 commit
+
+**已知问题**
+
+- 效果文件普遍带 `from __future__ import annotations`，注解会被延迟为字符串。
+  注册表已用 `get_type_hints` 处理，**新增效果时不要改这段逻辑**。
+- 录音状态目前靠前端轮询 `/api/audio/record/status`，中期改为 WebSocket。
+
+---
+
+## 12. 变更日志
+
+| 日期 | 改动 | 作者 |
+|---|---|---|
+| 2026-09-02 | 初始化项目：技术选型、架构设计、目录骨架、契约层、基础效果、项目文档 | 组长 |
+| 2026-09-02 | 补完服务入口与三个路由模块、频谱分析、Vue 前端工程；测试 27 项通过；修复注册表参数模型解析失败与定时录音取不到数据两个缺陷 | 组长 |
