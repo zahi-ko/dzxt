@@ -280,6 +280,7 @@ uv run pytest
 - [x] 契约层 `server/schemas.py` 与 `session_store.py`（2026-09-02）
 - [x] 1.3 接口骨架全部条目（2026-09-02）：注册表与基础效果、音频 I/O、main.py 与三个路由、Vue 3 + TS 前端、前后端联调（真实麦克风录音 → 波形 → 播放 → 效果 → 下载全链路验证通过）
 - [x] `scripts/setup.ps1` 一键环境脚本（2026-09-02）：依赖检查 → uv sync → npm install → ruff/pytest 验证；`download_models.py` 暂缓（拓展功能环境暂不配置）
+- [~] 1.4 开题报告初稿（2026-09-02）：按模板填写生成 `prod/开题报告（第14组）.docx`（正文四章 1998 字 + 图 1 架构框图 + 6 篇参考文献），待组内审核定稿
 
 待完成：
 
@@ -307,3 +308,4 @@ uv run pytest
 | 2026-09-02 | 完成 1.3 接口骨架：恢复快照 `1c6e868` 实现并适配新契约层（stats 返回 `AudioStatsResponse`、ruff 修复、测试重构 29 项全过）；Vue 3 + TS 前端工程落位，build 通过；真实麦克风全链路联调验证（录音→波形→播放→效果→下载→dist 托管→Vite 代理） | zahiko |
 | 2026-09-02 | 录音质量优化：默认采样率 16k → 48k（前后端同步），InputStream 显式 `blocksize=0` + `latency="low"`；零契约变更，提交 `14fe30b` | zahiko |
 | 2026-09-02 | 1.2 收尾：`scripts/setup.ps1` 一键环境脚本落位（uv/node 支持常见安装路径回退定位，规避受限终端 PATH 解析失败；EAP=Stop 下 stderr 重定向误抛已处理）；`download_models.py` 暂缓 | zahiko |
+| 2026-09-02 | 1.4 开题报告初稿：按模板生成 `prod/开题报告（第14组）.docx`（选题依据 346 / 研究现状 378 / 研究内容 577 / 技术路线 697 字，含架构框图与 6 篇参考文献）；`pyproject` 新增 `prod` 依赖组（python-docx / pymupdf，仅文档生成用）；进度文件同步 | zahiko |
