@@ -15,7 +15,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-DEFAULT_SAMPLE_RATE = 16000
+DEFAULT_SAMPLE_RATE = 48000
 SUPPORTED_SAMPLE_RATES = (8000, 16000, 22050, 44100, 48000)
 
 

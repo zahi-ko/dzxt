@@ -63,10 +63,14 @@ class Recorder:
         self._channels = channels
         self._started_at = time.monotonic()
 
+        # blocksize=0 交给 PortAudio 自适应缓冲；latency="low" 降低采集延迟。
+        # 缓冲过小易产生 glitch（丢帧爆音），故不锁死固定块大小。
         self._stream = sd.InputStream(
             samplerate=sample_rate,
             channels=channels,
             dtype="float32",
+            blocksize=0,
+            latency="low",
             callback=self._on_data,
         )
         self._stream.start()
