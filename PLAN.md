@@ -35,15 +35,15 @@
 
 - [x] 共享契约层 `server/schemas.py`
 - [x] 音频句柄仓库 `server/session_store.py`
-- [ ] 效果器注册表 `server/core/registry.py`
-- [ ] 基础效果：倒放、增益、倍速（变调/不变调）、归一化
-- [ ] 音频 I/O：录音器、播放器、文件读写
-- [ ] `server/main.py` 服务入口与静态资源托管
-- [ ] 路由 `/api/audio`：列表、上传、录音起停、播放、下载、删除
-- [ ] 路由 `/api/effects`：效果清单、施加效果
-- [ ] 路由 `/api/analysis`：频谱
-- [ ] Vue 3 + TypeScript + Vite 前端工程初始化（`web/`，见 ADR 0005）
-- [ ] 前后端联调打通：能录音 → 能看到波形 → 能播放
+- [x] 效果器注册表 `server/core/registry.py`
+- [x] 基础效果：倒放、增益、倍速（变调/不变调）、归一化
+- [x] 音频 I/O：录音器、播放器、文件读写
+- [x] `server/main.py` 服务入口与静态资源托管
+- [x] 路由 `/api/audio`：列表、上传、录音起停、播放、下载、删除
+- [x] 路由 `/api/effects`：效果清单、施加效果
+- [x] 路由 `/api/analysis`：频谱
+- [x] Vue 3 + TypeScript + Vite 前端工程初始化（`web/`，见 ADR 0005）
+- [x] 前后端联调打通：能录音 → 能看到波形 → 能播放
 
 ### 1.4 开题交付物
 
@@ -51,7 +51,7 @@
 - [ ] 架构设计说明书（可由 `AGENT.md` + ADR 整理）
 - [ ] 可运行的系统原型
 
-**下一个待办**：`server/core/registry.py` 效果器注册表。
+**下一个待办**：`scripts/setup.ps1` 一键环境脚本（1.2 收尾），随后进入 1.4 开题交付物。
 
 ---
 
