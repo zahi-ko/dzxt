@@ -281,7 +281,7 @@ uv run pytest
 
 待完成（从零重建，按 PLAN.md 阶段一推进）：
 
-- [ ] 契约层 `server/schemas.py` 与 `session_store.py`
+- [x] 契约层 `server/schemas.py` 与 `session_store.py`（2026-09-02）
 - [ ] 效果器注册表 `server/core/registry.py` 与基础效果
 - [ ] 音频 I/O 与频谱分析
 - [ ] 服务入口 `server/main.py` 与三个路由模块
@@ -304,3 +304,4 @@ uv run pytest
 | 2026-09-02 | 补完服务入口与三个路由模块、频谱分析、Vue 前端工程；测试 27 项通过；修复注册表参数模型解析失败与定时录音取不到数据两个缺陷 | 组长 |
 | 2026-09-02 | 清除全部具体代码（先提交备份快照 `1c6e868`），保留并完善架构：各模块目录补 README；Git 规范新增「每次改动后必须及时提交」硬性约束 | zahiko |
 | 2026-09-02 | 前端技术栈由「原生 JS」改为 TypeScript（ADR 0005）；默认分支明确为 `master`；同步更新 web/README 与 PLAN.md | zahiko |
+| 2026-09-02 | 契约层落地：`server/schemas.py`（含新增 `AudioStatsResponse`，修正旧实现 stats 返回裸 dict 的问题）与 `server/session_store.py`（audio_id 句柄仓库）；ruff 与冒烟验证通过，提交 `d81bd10` | zahiko |

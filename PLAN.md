@@ -33,8 +33,8 @@
 
 > 2026-09-02 代码清除后重置。旧实现的参考在 git 快照 `1c6e868`。
 
-- [ ] 共享契约层 `server/schemas.py`
-- [ ] 音频句柄仓库 `server/session_store.py`
+- [x] 共享契约层 `server/schemas.py`
+- [x] 音频句柄仓库 `server/session_store.py`
 - [ ] 效果器注册表 `server/core/registry.py`
 - [ ] 基础效果：倒放、增益、倍速（变调/不变调）、归一化
 - [ ] 音频 I/O：录音器、播放器、文件读写
@@ -51,7 +51,7 @@
 - [ ] 架构设计说明书（可由 `AGENT.md` + ADR 整理）
 - [ ] 可运行的系统原型
 
-**下一个待办**：`server/schemas.py` 契约层。
+**下一个待办**：`server/core/registry.py` 效果器注册表。
 
 ---
 
