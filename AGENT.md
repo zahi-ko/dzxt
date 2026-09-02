@@ -215,8 +215,8 @@ dzxt/
 ### 8.1 Git
 
 - **每次改动后都必须及时使用 git 提交**——这是硬性约束。小步提交，做完一件事立刻 commit，不攒批量、不过夜；提交前跑检查命令（见下）
-- 默认分支为 **`master`**，`master` 为稳定分支，**不直接提交**
-- 开发分支命名：`feat/<模块>-<功能>`，例：`feat/effects-tempo`、`feat/web-waveform`
+- 默认分支为 **`master`**，**直接在 `master` 上提交，不另开开发分支**。仅在确需隔离（如大重构、并行实验）时临时开分支，但非强制
+- 开发分支命名：`feat/<模块>-<功能>`，例：`feat/effects-tempo`、`feat/web-waveform`（仅在确需隔离时使用）
 - 提交信息：`feat|fix|refactor|docs|test(模块): 简述`
 - 提交前必须：
 
@@ -232,7 +232,6 @@ uv run pytest
 
 - `server/schemas.py` 改动 → 全组同步
 - 其余改动 → 知会对应模块负责人即可
-- 合并到 `master` 前至少一人过目
 
 ---
 
@@ -305,3 +304,4 @@ uv run pytest
 | 2026-09-02 | 清除全部具体代码（先提交备份快照 `1c6e868`），保留并完善架构：各模块目录补 README；Git 规范新增「每次改动后必须及时提交」硬性约束 | zahiko |
 | 2026-09-02 | 前端技术栈由「原生 JS」改为 TypeScript（ADR 0005）；默认分支明确为 `master`；同步更新 web/README 与 PLAN.md | zahiko |
 | 2026-09-02 | 契约层落地：`server/schemas.py`（含新增 `AudioStatsResponse`，修正旧实现 stats 返回裸 dict 的问题）与 `server/session_store.py`（audio_id 句柄仓库）；ruff 与冒烟验证通过，提交 `d81bd10` | zahiko |
+| 2026-09-02 | 调整 Git 规范：默认直接在 `master` 提交，取消「不直接提交」与「合并前至少一人过目」约束，开发分支改为可选 | zahiko |
