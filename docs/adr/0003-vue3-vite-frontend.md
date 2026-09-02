@@ -1,6 +1,6 @@
 # ADR 0003：前端采用 Vue 3 + Vite
 
-- **状态**：已接受
+- **状态**：已接受（JavaScript 部分已被 [ADR 0005](0005-frontend-typescript.md) 修订为 TypeScript，Vue 3 + Vite 决策不变）
 - **日期**：2026-09-02
 - **相关**：ADR 0002、AGENT.md 第 3 节
 

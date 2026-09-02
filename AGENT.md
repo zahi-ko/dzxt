@@ -53,7 +53,7 @@
 | Web 框架 | **FastAPI** + Pydantic v2 + uvicorn | 自动 OpenAPI 即接口契约 |
 | 音频 I/O | **sounddevice** + **soundfile** | 采集播放与文件读写 |
 | DSP | **numpy** + **scipy.signal** | 不引入 librosa，算法自行实现便于答辩讲原理 |
-| 前端 | **Vue 3 + Vite**（原生 JS，非 TS） | 组件化 + 响应式，代价仅多一条构建链 |
+| 前端 | **Vue 3 + TypeScript + Vite** | 组件化 + 响应式；TS 类型约束提升鲁棒性（见 `docs/adr/0005-frontend-typescript.md`） |
 | 测试 | pytest | Core 层纯函数优先覆盖 |
 | 代码检查 | ruff | 提交前必跑 |
 
@@ -159,11 +159,11 @@ dzxt/
 │
 ├── web/
 │   ├── index.html
-│   ├── vite.config.js    /api 代理到 8000
+│   ├── vite.config.ts    /api 代理到 8000
 │   └── src/
-│       ├── main.js
-│       ├── App.vue       状态中枢
-│       ├── api.js        【唯一后端耦合点】
+│       ├── main.ts
+│       ├── App.vue       状态中枢（<script setup lang="ts">）
+│       ├── api.ts        【唯一后端耦合点】接口类型定义镜像 server/schemas.py
 │       └── components/   采集 / 列表 / 波形 / 频谱 / 效果面板
 │
 ├── services/
@@ -206,7 +206,7 @@ dzxt/
 - 错误统一返回 `{"detail": "..."}` + 合适状态码
 - 接口优先：先写 schema 与返回 mock 的 router stub，前端即可并行开工，不等后端实现
 
-**前端对称约束**：所有网络请求封在 `web/src/api.js`，Vue 组件不直接调用 `fetch` 或 `axios`。
+**前端对称约束**：所有网络请求封在 `web/src/api.ts`，并在此定义与 `server/schemas.py` 对应的 TS 类型；Vue 组件不直接调用 `fetch` 或 `axios`。源码一律 TypeScript，禁止混入裸 `.js` 源文件。
 
 ---
 
@@ -215,7 +215,7 @@ dzxt/
 ### 8.1 Git
 
 - **每次改动后都必须及时使用 git 提交**——这是硬性约束。小步提交，做完一件事立刻 commit，不攒批量、不过夜；提交前跑检查命令（见下）
-- `main` 分支为稳定分支，**不直接提交**
+- 默认分支为 **`master`**，`master` 为稳定分支，**不直接提交**
 - 开发分支命名：`feat/<模块>-<功能>`，例：`feat/effects-tempo`、`feat/web-waveform`
 - 提交信息：`feat|fix|refactor|docs|test(模块): 简述`
 - 提交前必须：
@@ -232,7 +232,7 @@ uv run pytest
 
 - `server/schemas.py` 改动 → 全组同步
 - 其余改动 → 知会对应模块负责人即可
-- 合并到 `main` 前至少一人过目
+- 合并到 `master` 前至少一人过目
 
 ---
 
@@ -285,14 +285,14 @@ uv run pytest
 - [ ] 效果器注册表 `server/core/registry.py` 与基础效果
 - [ ] 音频 I/O 与频谱分析
 - [ ] 服务入口 `server/main.py` 与三个路由模块
-- [ ] Vue 3 + Vite 前端工程
+- [ ] Vue 3 + TypeScript + Vite 前端工程
 - [ ] 测试与 ruff 检查
 - [ ] `scripts/setup.ps1` 与 `scripts/download_models.py`
 
 **重建提醒**
 
 - 效果函数必须纯函数；注册表用 `get_type_hints` 解析参数模型，效果文件里不要用 `from __future__ import annotations`
-- 前端所有请求走 `/api/...` 相对路径，网络代码只写在 `web/src/api.js`
+- 前端所有请求走 `/api/...` 相对路径，网络代码只写在 `web/src/api.ts`；源码一律 TypeScript（ADR 0005）
 
 ---
 
@@ -303,3 +303,4 @@ uv run pytest
 | 2026-09-02 | 初始化项目：技术选型、架构设计、目录骨架、契约层、基础效果、项目文档 | 组长 |
 | 2026-09-02 | 补完服务入口与三个路由模块、频谱分析、Vue 前端工程；测试 27 项通过；修复注册表参数模型解析失败与定时录音取不到数据两个缺陷 | 组长 |
 | 2026-09-02 | 清除全部具体代码（先提交备份快照 `1c6e868`），保留并完善架构：各模块目录补 README；Git 规范新增「每次改动后必须及时提交」硬性约束 | zahiko |
+| 2026-09-02 | 前端技术栈由「原生 JS」改为 TypeScript（ADR 0005）；默认分支明确为 `master`；同步更新 web/README 与 PLAN.md | zahiko |
