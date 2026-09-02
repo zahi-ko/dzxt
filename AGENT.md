@@ -13,7 +13,7 @@
 
 1. 读本文件全文
 2. 读 `PLAN.md`，定位当前处于哪个阶段、下一个待办是什么
-3. 确认环境可用：`uv run python -c "import server.schemas"`
+3. 确认环境可用：`uv sync`（首次或依赖变更后），再 `uv run ruff check .`
 4. 打开 `http://127.0.0.1:5173`（前端）与 `http://127.0.0.1:8000/docs`（接口文档）
 5. 收工前回来更新「当前进展」与「变更日志」
 
@@ -214,6 +214,7 @@ dzxt/
 
 ### 8.1 Git
 
+- **每次改动后都必须及时使用 git 提交**——这是硬性约束。小步提交，做完一件事立刻 commit，不攒批量、不过夜；提交前跑检查命令（见下）
 - `main` 分支为稳定分支，**不直接提交**
 - 开发分支命名：`feat/<模块>-<功能>`，例：`feat/effects-tempo`、`feat/web-waveform`
 - 提交信息：`feat|fix|refactor|docs|test(模块): 简述`
@@ -267,38 +268,31 @@ uv run pytest
 
 ## 11. 当前进展
 
-**阶段：开题（接口骨架已跑通，待提交）**
+**阶段：开题（架构骨架就绪，代码待重新实现）**
+
+> 2026-09-02：应用户要求清除了全部具体代码（实现前已提交完整备份快照 `1c6e868`，需要参考旧实现可 `git show 1c6e868:<path>` 查看）。技术栈、数据契约、目录职责等架构约定全部保留，各模块目录已补 README 说明目标结构与职责。
 
 已完成：
 
 - [x] 技术栈选型与架构设计（见 `docs/adr/`）
-- [x] 仓库初始化、目录骨架
-- [x] Python 3.11 环境 + 主干依赖安装（uv）
-- [x] 共享契约层 `server/schemas.py`
-- [x] 效果器注册表 `server/core/registry.py`
-- [x] 音频句柄仓库 `server/session_store.py`
-- [x] 基础效果：倒放、增益、倍速（变调/不变调）、归一化
-- [x] 音频 I/O：录音器、播放器、文件读写
-- [x] 频谱分析与波形包络抽取 `server/core/analysis/spectrum.py`
-- [x] 服务入口 `server/main.py` 与三个路由模块（audio / effects / analysis）
-- [x] Vue 3 + Vite 前端工程（录音、列表、波形、频谱、动态效果表单）
-- [x] 测试 27 项全通过，ruff 检查通过
+- [x] 仓库初始化、目录骨架（含各模块 README 与 .gitkeep）
+- [x] Python 3.11 环境 + 主干依赖锁定（`pyproject.toml` + `uv.lock`）
 - [x] 项目文档：AGENT.md、PLAN.md、ADR 0001–0004
 
-待完成：
+待完成（从零重建，按 PLAN.md 阶段一推进）：
 
-- [ ] 前后端联调实机验证（需麦克风与扬声器）
-- [ ] 录音电平改用 WebSocket 推送（当前为 300ms 轮询，中期再优化）
-- [ ] 语谱图（STFT 热力图）
-- [ ] `scripts/setup.ps1` 一键环境脚本
-- [ ] `scripts/download_models.py` 模型下载脚本骨架
-- [ ] 首个 commit
+- [ ] 契约层 `server/schemas.py` 与 `session_store.py`
+- [ ] 效果器注册表 `server/core/registry.py` 与基础效果
+- [ ] 音频 I/O 与频谱分析
+- [ ] 服务入口 `server/main.py` 与三个路由模块
+- [ ] Vue 3 + Vite 前端工程
+- [ ] 测试与 ruff 检查
+- [ ] `scripts/setup.ps1` 与 `scripts/download_models.py`
 
-**已知问题**
+**重建提醒**
 
-- 效果文件普遍带 `from __future__ import annotations`，注解会被延迟为字符串。
-  注册表已用 `get_type_hints` 处理，**新增效果时不要改这段逻辑**。
-- 录音状态目前靠前端轮询 `/api/audio/record/status`，中期改为 WebSocket。
+- 效果函数必须纯函数；注册表用 `get_type_hints` 解析参数模型，效果文件里不要用 `from __future__ import annotations`
+- 前端所有请求走 `/api/...` 相对路径，网络代码只写在 `web/src/api.js`
 
 ---
 
@@ -308,3 +302,4 @@ uv run pytest
 |---|---|---|
 | 2026-09-02 | 初始化项目：技术选型、架构设计、目录骨架、契约层、基础效果、项目文档 | 组长 |
 | 2026-09-02 | 补完服务入口与三个路由模块、频谱分析、Vue 前端工程；测试 27 项通过；修复注册表参数模型解析失败与定时录音取不到数据两个缺陷 | 组长 |
+| 2026-09-02 | 清除全部具体代码（先提交备份快照 `1c6e868`），保留并完善架构：各模块目录补 README；Git 规范新增「每次改动后必须及时提交」硬性约束 | zahiko |
