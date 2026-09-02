@@ -279,10 +279,11 @@ uv run pytest
 - [x] 项目文档：AGENT.md、PLAN.md、ADR 0001–0004
 - [x] 契约层 `server/schemas.py` 与 `session_store.py`（2026-09-02）
 - [x] 1.3 接口骨架全部条目（2026-09-02）：注册表与基础效果、音频 I/O、main.py 与三个路由、Vue 3 + TS 前端、前后端联调（真实麦克风录音 → 波形 → 播放 → 效果 → 下载全链路验证通过）
+- [x] `scripts/setup.ps1` 一键环境脚本（2026-09-02）：依赖检查 → uv sync → npm install → ruff/pytest 验证；`download_models.py` 暂缓（拓展功能环境暂不配置）
 
 待完成：
 
-- [ ] `scripts/setup.ps1` 与 `scripts/download_models.py`（1.2 收尾）
+- [ ] `scripts/download_models.py` 模型下载脚本（暂缓，待拓展功能环境配置时再补）
 - [ ] 1.4 开题交付物：开题报告、架构设计说明书、可运行系统原型
 - [ ] 阶段二功能开发（见 PLAN.md）
 
@@ -304,3 +305,5 @@ uv run pytest
 | 2026-09-02 | 契约层落地：`server/schemas.py`（含新增 `AudioStatsResponse`，修正旧实现 stats 返回裸 dict 的问题）与 `server/session_store.py`（audio_id 句柄仓库）；ruff 与冒烟验证通过，提交 `d81bd10` | zahiko |
 | 2026-09-02 | 调整 Git 规范：默认直接在 `master` 提交，取消「不直接提交」与「合并前至少一人过目」约束，开发分支改为可选 | zahiko |
 | 2026-09-02 | 完成 1.3 接口骨架：恢复快照 `1c6e868` 实现并适配新契约层（stats 返回 `AudioStatsResponse`、ruff 修复、测试重构 29 项全过）；Vue 3 + TS 前端工程落位，build 通过；真实麦克风全链路联调验证（录音→波形→播放→效果→下载→dist 托管→Vite 代理） | zahiko |
+| 2026-09-02 | 录音质量优化：默认采样率 16k → 48k（前后端同步），InputStream 显式 `blocksize=0` + `latency="low"`；零契约变更，提交 `14fe30b` | zahiko |
+| 2026-09-02 | 1.2 收尾：`scripts/setup.ps1` 一键环境脚本落位（uv/node 支持常见安装路径回退定位，规避受限终端 PATH 解析失败；EAP=Stop 下 stderr 重定向误抛已处理）；`download_models.py` 暂缓 | zahiko |
