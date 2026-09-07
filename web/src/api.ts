@@ -47,6 +47,24 @@ export interface RecordLevelMessage {
   peak: number
 }
 
+export interface EffectChainResponse {
+  audio_id: string
+  meta: AudioMeta
+  applied: string[]
+}
+
+export interface EffectHistoryItem {
+  effect: string
+  title: string
+  params: Record<string, unknown>
+}
+
+export interface EffectHistoryResponse {
+  audio_id: string
+  root_id: string
+  steps: EffectHistoryItem[]
+}
+
 export interface EffectInfo {
   name: string
   title: string
@@ -193,6 +211,19 @@ export const api = {
       params: options.params,
       save_as_new: options.saveAsNew ?? true,
     }),
+  applyChain: (options: {
+    audioId: string
+    steps: { effect: string; params: Record<string, unknown> }[]
+    saveAsNew?: boolean
+  }) =>
+    post<EffectChainResponse>('/effects/chain', {
+      audio_id: options.audioId,
+      steps: options.steps,
+      save_as_new: options.saveAsNew ?? true,
+    }),
+  undo: (audioId: string) =>
+    post<ApplyEffectResponse>('/effects/undo', { audio_id: audioId }),
+  history: (audioId: string) => request<EffectHistoryResponse>(`/effects/${audioId}/history`),
 
   spectrum: (audioId: string, nFft = 2048) =>
     post<SpectrumResponse>('/analysis/spectrum', { audio_id: audioId, n_fft: nFft }),

@@ -12,12 +12,12 @@ from __future__ import annotations
 import threading
 import time
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 
 import numpy as np
 
-from server.schemas import AudioMeta
+from server.schemas import AudioMeta, EffectHistoryItem
 
 
 @dataclass
@@ -27,6 +27,10 @@ class AudioEntry:
     sample_rate: int
     created_at: datetime
     label: str = ""
+    # 血统：source_id 指向上一步结果，steps 记录从源头到本品施加过的全部效果。
+    # 有了它，「处理历史」「撤销」「A/B 对比基准」都只是读这两个字段。
+    source_id: str | None = None
+    steps: list[EffectHistoryItem] = field(default_factory=list)
 
     @property
     def channels(self) -> int:
@@ -54,16 +58,34 @@ class SessionStore:
         self._items: dict[str, AudioEntry] = {}
         self._lock = threading.RLock()
 
-    def put(self, data: np.ndarray, sample_rate: int, label: str = "") -> AudioEntry:
+    def put(
+        self,
+        data: np.ndarray,
+        sample_rate: int,
+        label: str = "",
+        source_id: str | None = None,
+        steps: list[EffectHistoryItem] | None = None,
+    ) -> AudioEntry:
         entry = AudioEntry(
             audio_id=uuid.uuid4().hex[:12],
             data=np.asarray(data, dtype=np.float32),
             sample_rate=int(sample_rate),
             created_at=datetime.now(),
             label=label,
+            source_id=source_id,
+            steps=list(steps) if steps else [],
         )
         with self._lock:
             self._items[entry.audio_id] = entry
+        return entry
+
+    def root_of(self, audio_id: str) -> AudioEntry:
+        """沿 source_id 上溯到链条起点（录音或上传的那一版）。"""
+        entry = self.get(audio_id)
+        seen = {audio_id}
+        while entry.source_id and entry.source_id not in seen:
+            seen.add(entry.source_id)
+            entry = self.get(entry.source_id)
         return entry
 
     def get(self, audio_id: str) -> AudioEntry:

@@ -12,7 +12,9 @@ import type {
 } from './api'
 import AudioInfo from './components/AudioInfo.vue'
 import AudioLibrary from './components/AudioLibrary.vue'
+import EffectChainPanel from './components/EffectChainPanel.vue'
 import EffectPanel from './components/EffectPanel.vue'
+import HistoryPanel from './components/HistoryPanel.vue'
 import RecorderCard from './components/RecorderCard.vue'
 import SpectrogramCanvas from './components/SpectrogramCanvas.vue'
 import SpectrumCanvas from './components/SpectrumCanvas.vue'
@@ -49,6 +51,8 @@ const spectrogram = ref<SpectrogramResponse>({
 const stats = ref<AudioStatsResponse | null>(null)
 const selection = ref<{ start: number; end: number } | null>(null)
 const playhead = ref(-1)
+// 处理后自增，驱动处理历史面板重新拉取
+const historyToken = ref(0)
 const errorMessage = ref('')
 const online = ref(false)
 
@@ -143,6 +147,7 @@ async function handleApplied(result: ApplyEffectResponse) {
   try {
     await refreshAudios()
     await selectAudio(result.audio_id)
+    historyToken.value += 1
   } catch (error) {
     showError((error as Error).message)
   }
@@ -238,6 +243,18 @@ onMounted(async () => {
           :effects="effects"
           :audio-id="selectedId"
           @applied="handleApplied"
+          @error="showError"
+        />
+        <EffectChainPanel
+          :effects="effects"
+          :audio-id="selectedId"
+          @applied="handleApplied"
+          @error="showError"
+        />
+        <HistoryPanel
+          :audio-id="selectedId"
+          :reload-token="historyToken"
+          @navigate="selectAudio"
           @error="showError"
         />
       </aside>

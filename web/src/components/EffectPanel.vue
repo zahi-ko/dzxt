@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { api, schemaToFields } from '../api'
 import type { ApplyEffectResponse, EffectInfo, FormField } from '../api'
+import EffectParamsFields from './EffectParamsFields.vue'
 
 // 这个面板没有任何硬编码的效果名。
 // 效果清单与参数表单全部来自后端注册表的 JSON Schema，
@@ -56,14 +57,6 @@ watch(
   { immediate: true }
 )
 
-function hasRange(field: FormField): boolean {
-  return field.min !== undefined && field.max !== undefined
-}
-
-function step(field: FormField): number {
-  return ((field.max ?? 0) - (field.min ?? 0)) / 100
-}
-
 async function apply() {
   if (!props.audioId || !selectedName.value) return
   busy.value = true
@@ -100,30 +93,7 @@ async function apply() {
         <p v-if="current?.description" class="hint">{{ current.description }}</p>
       </div>
 
-      <div v-for="field in fields" :key="field.key" class="field">
-        <label>
-          {{ field.label }}
-          <span class="mono dim">{{ params[field.key] }}</span>
-        </label>
-
-        <input
-          v-if="field.type === 'boolean'"
-          v-model="params[field.key]"
-          type="checkbox"
-        />
-        <template v-else-if="hasRange(field)">
-          <input
-            v-model.number="params[field.key]"
-            type="range"
-            :min="field.min"
-            :max="field.max"
-            :step="step(field)"
-          />
-        </template>
-        <input v-else v-model.number="params[field.key]" type="number" />
-
-        <p v-if="field.description" class="hint">{{ field.description }}</p>
-      </div>
+      <EffectParamsFields v-model="params" :fields="fields" />
 
       <div class="field">
         <label class="check">
