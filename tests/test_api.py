@@ -151,3 +151,118 @@ def test_upload_rejects_garbage(client: TestClient) -> None:
         "/api/audio/upload", files={"file": ("bad.wav", b"not-a-wav", "audio/wav")}
     )
     assert response.status_code == 415
+
+
+# ---------- 阶段二新增：设备 / 效果链 / 历史 / 撤销 / 语谱图 / 流 ----------
+
+
+def test_devices_endpoint(client: TestClient) -> None:
+    body = client.get("/api/audio/devices").json()
+    assert "items" in body
+    # 无声卡的机器也应返回空列表而不是 500
+    for device in body["items"]:
+        assert device["channels"] >= 1
+
+
+def test_record_start_rejects_unsupported_sample_rate(client: TestClient) -> None:
+    response = client.post(
+        "/api/audio/record/start", json={"sample_rate": 12345, "duration": None}
+    )
+    assert response.status_code == 400
+
+
+def test_chain_applies_steps_in_order(client: TestClient) -> None:
+    audio_id = upload(client)
+    response = client.post(
+        "/api/effects/chain",
+        json={
+            "audio_id": audio_id,
+            "steps": [
+                {"effect": "gain", "params": {"db": 6}},
+                {"effect": "reverse", "params": {}},
+            ],
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["applied"] == ["音量增益", "倒放"]
+    assert body["audio_id"] != audio_id
+    # 效果链只产出一个新句柄，不留下中间产物
+    assert len(client.get("/api/audio").json()["items"]) == 2
+
+
+def test_chain_rejects_empty_steps(client: TestClient) -> None:
+    audio_id = upload(client)
+    assert client.post("/api/effects/chain", json={"audio_id": audio_id, "steps": []}).status_code == 400
+
+
+def test_chain_reports_bad_step_index(client: TestClient) -> None:
+    audio_id = upload(client)
+    response = client.post(
+        "/api/effects/chain",
+        json={
+            "audio_id": audio_id,
+            "steps": [{"effect": "gain", "params": {}}, {"effect": "nope", "params": {}}],
+        },
+    )
+    assert response.status_code == 404
+    assert "第 2 步" in response.json()["detail"]
+
+
+def test_history_records_full_lineage(client: TestClient) -> None:
+    audio_id = upload(client)
+    first = client.post(
+        "/api/effects/apply", json={"audio_id": audio_id, "effect": "gain", "params": {"db": 3}}
+    ).json()["audio_id"]
+    second = client.post(
+        "/api/effects/apply", json={"audio_id": first, "effect": "reverse", "params": {}}
+    ).json()["audio_id"]
+
+    body = client.get(f"/api/effects/{second}/history").json()
+    assert body["root_id"] == audio_id
+    assert [step["effect"] for step in body["steps"]] == ["gain", "reverse"]
+
+
+def test_undo_jumps_to_previous_handle(client: TestClient) -> None:
+    audio_id = upload(client)
+    processed = client.post(
+        "/api/effects/apply", json={"audio_id": audio_id, "effect": "gain", "params": {"db": 3}}
+    ).json()["audio_id"]
+
+    body = client.post("/api/effects/undo", json={"audio_id": processed}).json()
+    assert body["audio_id"] == audio_id
+
+
+def test_undo_on_original_returns_400(client: TestClient) -> None:
+    audio_id = upload(client)
+    assert client.post("/api/effects/undo", json={"audio_id": audio_id}).status_code == 400
+
+
+def test_undo_with_deleted_parent_returns_409(client: TestClient) -> None:
+    audio_id = upload(client)
+    processed = client.post(
+        "/api/effects/apply", json={"audio_id": audio_id, "effect": "gain", "params": {"db": 3}}
+    ).json()["audio_id"]
+
+    assert client.delete(f"/api/audio/{audio_id}").status_code == 204
+    assert client.post("/api/effects/undo", json={"audio_id": processed}).status_code == 409
+
+
+def test_spectrogram_endpoint(client: TestClient) -> None:
+    audio_id = upload(client, seconds=1.0)
+    body = client.post(
+        "/api/analysis/spectrogram", json={"audio_id": audio_id, "n_fft": 512, "max_frames": 120}
+    ).json()
+    assert body["frames"] <= 120
+    assert body["bins"] == 257
+    assert len(body["data"]) == body["frames"] * body["bins"]
+    assert all(0 <= value <= 255 for value in body["data"][:1000])
+
+
+def test_stream_is_inline_wav(client: TestClient) -> None:
+    audio_id = upload(client)
+    response = client.get(f"/api/audio/{audio_id}/stream")
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "audio/wav"
+    assert "inline" in response.headers["content-disposition"]
+    assert response.content[:4] == b"RIFF"

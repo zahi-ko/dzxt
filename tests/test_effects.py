@@ -10,6 +10,7 @@ import numpy as np
 import pytest
 
 import server.core.effects  # noqa: F401  触发效果器注册
+from server.core.analysis.spectrogram import quantize_db, stft_magnitude_db
 from server.core.analysis.spectrum import average_spectrum, waveform_envelope
 from server.core.registry import apply_effect, get_effect, list_effects
 
@@ -112,3 +113,67 @@ def test_average_spectrum_peaks_at_tone_frequency() -> None:
     freqs, magnitude_db = average_spectrum(x, SR, n_fft=2048)
     peak_index = int(np.argmax(magnitude_db))
     assert freqs[peak_index] == pytest.approx(1000.0, abs=20.0)
+
+
+# ---------- 阶段二新增：裁剪 / 淡入淡出 / 降噪 / 语谱图 ----------
+
+
+def test_trim_cuts_selected_range() -> None:
+    x = tone(2.0)
+    out = apply_effect("trim", x, SR, {"start_sec": 0.5, "end_sec": 1.0})
+    assert out.shape[0] == pytest.approx(int(0.5 * SR), rel=0.01)
+
+
+def test_trim_with_zero_end_goes_to_tail() -> None:
+    x = tone(2.0)
+    out = apply_effect("trim", x, SR, {"start_sec": 1.5, "end_sec": 0.0})
+    assert out.shape[0] == pytest.approx(int(0.5 * SR), rel=0.01)
+
+
+def test_fade_edges_go_to_zero_and_middle_unchanged() -> None:
+    x = np.ones(SR, dtype=np.float32) * 0.5
+    out = apply_effect("fade", x, SR, {"fade_in": 0.1, "fade_out": 0.1})
+
+    assert out[0] == pytest.approx(0.0, abs=1e-6)
+    assert out[-1] == pytest.approx(0.0, abs=1e-6)
+    assert out[SR // 2] == pytest.approx(0.5, abs=1e-6)
+
+
+def test_denoise_preserves_length_and_improves_snr() -> None:
+    # 类语音激励：谐波串 + 停顿，模拟音节间隙
+    rng = np.random.default_rng(0)
+    length = SR * 2
+    t = np.arange(length) / SR
+    env = ((np.arange(length) // int(0.15 * SR)) % 2 == 0).astype(np.float32)
+    clean = np.zeros(length, dtype=np.float32)
+    for harmonic in (1, 2, 3, 5):
+        clean += (0.25 / harmonic) * np.sin(2 * np.pi * 300 * harmonic * t).astype(np.float32)
+    clean = (clean * env).astype(np.float32)
+    noisy = np.clip(clean + 0.08 * rng.standard_normal(length), -1, 1).astype(np.float32)
+
+    def snr(reference: np.ndarray, actual: np.ndarray) -> float:
+        residual = float(np.sum((reference - actual) ** 2))
+        return 10 * np.log10(float(np.sum(reference**2)) / max(residual, 1e-12))
+
+    out = apply_effect("denoise", noisy, SR, {"strength": 1.0})
+    assert out.shape[0] == noisy.shape[0]
+    assert snr(clean, out) > snr(clean, noisy)
+
+
+def test_denoise_handles_stereo() -> None:
+    x = np.stack([tone(0.5), tone(0.5, freq=880.0)], axis=1)
+    out = apply_effect("denoise", x, SR, {"strength": 1.0})
+    assert out.ndim == 2
+    assert out.shape == x.shape
+
+
+def test_spectrogram_shape_and_quantization() -> None:
+    magnitude_db, times, freqs = stft_magnitude_db(tone(1.0), SR, n_fft=512, max_frames=200)
+    assert magnitude_db.shape[1] == 512 // 2 + 1
+    assert magnitude_db.shape[0] <= 200
+    assert len(times) == magnitude_db.shape[0]
+    assert len(freqs) == magnitude_db.shape[1]
+
+    quantized = quantize_db(magnitude_db, -80.0, 0.0)
+    assert quantized.dtype == np.uint8
+    assert quantized.min() >= 0 and quantized.max() <= 255

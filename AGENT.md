@@ -110,7 +110,8 @@ Vite 已配置代理：前端所有 `/api/*` 请求自动转发到 `127.0.0.1:80
 
 - 好处一：音频再长，接口负载不变
 - 好处二：处理历史天然形成链表，撤销/对比功能直接可用
-- 前端唯一接触音频二进制的场景是导出下载
+- 前端唯一接触音频二进制的场景是**导出下载与播放流**（`GET /api/audio/{id}/stream`），
+  二者都是终点消费；链路内部依旧只传 `audio_id`。播放放前端的原因见 ADR 0007
 
 ### 铁律三：效果器注册表
 
@@ -152,11 +153,11 @@ dzxt/
 │   ├── session_store.py  audio_id 句柄仓库
 │   ├── api/
 │   │   ├── deps.py       路由公共依赖（句柄 → 404）
-│   │   └── routers/      audio / effects / analysis
+│   │   └── routers/      audio / effects / analysis / realtime(ws)
 │   └── core/
 │       ├── registry.py   效果器注册表
 │       ├── effects/      处理算法，一个效果一个文件
-│       ├── analysis/     频谱与波形包络
+│       ├── analysis/     频谱、语谱图、波形包络
 │       └── io/           录音播放、文件读写
 │
 ├── web/
@@ -166,7 +167,7 @@ dzxt/
 │       ├── main.ts
 │       ├── App.vue       状态中枢（<script setup lang="ts">）
 │       ├── api.ts        【唯一后端耦合点】接口类型定义镜像 server/schemas.py
-│       └── components/   采集 / 列表 / 波形 / 频谱 / 效果面板
+│       └── components/   采集 / 列表 / 播放器 / 波形 / 频谱 / 语谱图 / 效果与历史
 │
 ├── services/
 │   └── clone/            语音克隆子服务，独立环境（待实现）
@@ -176,7 +177,7 @@ dzxt/
 │   └── sessions/         每个 session 的收工日志
 │
 ├── tests/                pytest
-└── scripts/              环境与模型下载脚本
+└── scripts/              打包与冒烟脚本（smoke.py 为提交前必跑）
 ```
 
 ---
@@ -225,6 +226,7 @@ dzxt/
 ```bash
 uv run ruff check .
 uv run pytest
+uv run python scripts/smoke.py   # 端到端冒烟：采集→显示→处理→历史→播放/导出
 ```
 
 - 大文件（模型权重、测试音频）**禁止入库**，一律 `.gitignore` + `scripts/` 下载脚本
@@ -271,7 +273,7 @@ uv run pytest
 
 ## 11. 当前进展
 
-**阶段：开题（1.3 接口骨架已完成，全链路可跑通）**
+**阶段：中期（2.1 采集 / 2.2 显示 / 2.3 处理 / 2.4 播放 / 2.5 工程质量 全部完成）**
 
 > 2026-09-02：应用户要求清除了全部具体代码（实现前已提交完整备份快照 `1c6e868`，需要参考旧实现可 `git show 1c6e868:<path>` 查看）。技术栈、数据契约、目录职责等架构约定全部保留，各模块目录已补 README 说明目标结构与职责。
 
@@ -293,7 +295,16 @@ uv run pytest
 - [x] 1.4 开题交付物第一项（2026-09-06）：开题报告按模板重新生成并交付 `prod/report_work/开题报告（第14组）.docx`；正文 1999 字（节1/2/3/4 = 309/366/664/660），三项拓展功能在第 3 节研究内容中全部覆盖；架构框图嵌入第 4 节，6 篇参考文献；表头学号/专业位留「（待补）」待用户手工补填（已知限制）
 - [x] 1.4 可运行的系统原型（2026-09-07）：随打包分发流水线一并完成并验证
 - [ ] 1.4 其余交付物：架构设计说明书（报告与 PPT 类未显式要求不列入待办，见第 9 节规则）
-- [ ] 阶段二功能开发（见 PLAN.md）
+- [x] 阶段二功能开发（2026-09-07）：采集（设备/声道/WS 电平/定时停止）、显示（波形缩放选区/频谱/语谱图/信息卡）、处理（淡入淡出/谱减降噪/效果链/历史撤销/A-B 对比）、播放（流端点 + 播放器条），测试 46 项 + 冒烟脚本
+- [ ] 阶段三拓展功能（3.1 语音克隆 / 3.2 录音质量检测 / 3.3 语音加噪与降噪）
+
+### 阶段二补充约定
+
+- 播放改由前端 `<audio>` 承担，后端 `sd.play` 保留为退路（ADR 0007）
+- 效果产物带血统：`source_id`（上一版）+ `steps`（从源头起的全部步骤）。
+  处理历史读 `steps`，撤销就是跳回 `source_id` 指向的句柄——不覆盖、不删除，
+  因此撤销不会破坏别人正在对比的音频
+- 新增效果仍然只改 `server/core/effects/` + 一行 import；这次没破例
 
 **重建提醒**
 
@@ -319,3 +330,4 @@ uv run pytest
 | 2026-09-06 | 拓展功能范围确定：在语音克隆基础上新增「录音质量检测」（音量过轻 / 疑似爆音 / 环境噪声嘈杂度评估与重录建议）与「语音加噪与降噪」（可调信噪比加噪 + 谱减法降噪闭环验证）两项，共三项必做；PLAN.md 阶段三同步拆分为 3.1–3.5 | zahiko |
 | 2026-09-06 | 1.4 开题报告重做：依模板重新生成 `prod/report_work/开题报告（第14组）.docx`，正文 1999 字（节1/2/3/4 = 309/366/664/660，满足下限），表头姓名三行（学号/专业留「（待补）」由作者手工补）、题目与指导教师已填、☑1 工程技术 / ☑3 软件、第 4 节嵌入架构框图（`arch_diagram.png`，1724×1180 @300dpi）与图注；6 篇参考文献；`fill_report.py` 复现脚本（lxml 树级操作）；ruff check . 通过 | zahiko |
 | 2026-09-07 | 打包分发：`packaging/app.py` + `app.spec`（PyInstaller onedir，uvicorn 动态加载模块显式声明，前端 dist 外置）+ `scripts/build_release.ps1` 一键脚本（前端构建→打包→组装 voice-system/ + start.bat + 使用说明→zip→清理中间产物）；`server/main.py` 冻结环境探测（exe 同级挂载 web/dist）；pyinstaller 入 dev 组；.gitignore 增 release/、build/；node 定位支持 NODE_EXE 覆盖与多布局回退，npm.cmd 失败自动降级 node+npm-cli.js。用户系统终端手动验证通过；新增交付物规则：报告与 PPT 未显式要求不列入待办 | zahiko |
+| 2026-09-07 | 阶段二功能开发（分四次提交）：① 采集——`/api/audio/devices` 设备枚举与选择、单/双声道、`/ws/record` 20Hz 电平推送、无麦 503 容错 ② 显示——`POST /api/analysis/spectrogram`（dB 量化 uint8 下发）、波形缩放/框选/平移/定位、trim 与 fade 效果器、AudioInfo 信息卡 ③ 处理——denoise 谱减法、`/api/effects/chain`、`/api/effects/undo`、`/api/effects/{id}/history`、血统字段 source_id/steps、EffectChainPanel 与 HistoryPanel ④ 播放——`/api/audio/{id}/stream` + PlayerBar（进度/暂停/倍速/A-B 对比，ADR 0007）+ `scripts/smoke.py` 冒烟脚本；测试 29 → 46 项 | zahiko |
