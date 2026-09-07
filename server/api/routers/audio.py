@@ -11,10 +11,11 @@ from fastapi.responses import Response
 from server.api.deps import require_entry
 from server.core.analysis.spectrum import waveform_envelope
 from server.core.io.audio_file import dump_audio, load_audio
-from server.core.io.device import get_player, get_recorder
+from server.core.io.device import DeviceError, get_player, get_recorder, list_input_devices
 from server.schemas import (
     AudioListResponse,
     AudioMeta,
+    DeviceListResponse,
     RecordStartRequest,
     RecordStatusResponse,
     WaveformResponse,
@@ -27,6 +28,12 @@ router = APIRouter(prefix="/api/audio", tags=["audio"])
 @router.get("", response_model=AudioListResponse, summary="列出全部音频句柄")
 def list_audio() -> AudioListResponse:
     return AudioListResponse(items=[entry.to_meta() for entry in get_store().list()])
+
+
+@router.get("/devices", response_model=DeviceListResponse, summary="列出可用输入设备")
+def list_devices() -> DeviceListResponse:
+    items, default_index = list_input_devices()
+    return DeviceListResponse(items=items, default_index=default_index)
 
 
 @router.post("/upload", response_model=AudioMeta, summary="上传音频文件")
@@ -48,9 +55,17 @@ async def upload_audio(file: UploadFile = File(...)) -> AudioMeta:
 def start_record(request: RecordStartRequest) -> RecordStatusResponse:
     recorder = get_recorder()
     try:
-        recorder.start(sample_rate=request.sample_rate, channels=1, duration=request.duration)
+        recorder.start(
+            sample_rate=request.sample_rate,
+            channels=request.channels,
+            duration=request.duration,
+            device=request.device,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except DeviceError as exc:
+        # 无麦克风 / 设备被占用都归到这里：这是环境问题，不是请求错误
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     except RuntimeError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     return RecordStatusResponse(recording=True, elapsed=0.0, level=0.0)

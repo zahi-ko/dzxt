@@ -43,12 +43,39 @@ class RecordStartRequest(BaseModel):
         default=None, ge=0.1, le=300, description="最长录音秒数，None 表示手动停止"
     )
     sample_rate: int = Field(default=DEFAULT_SAMPLE_RATE)
+    channels: int = Field(default=1, ge=1, le=2, description="声道数：1 单声道，2 立体声")
+    device: int | None = Field(default=None, description="输入设备序号，None 表示系统默认设备")
 
 
 class RecordStatusResponse(BaseModel):
     recording: bool
     elapsed: float
     level: float = Field(default=0.0, description="当前帧 RMS 电平，用于前端实时电平条")
+
+
+class DeviceInfo(BaseModel):
+    """音频输入设备描述。前端据此生成设备下拉框。"""
+
+    index: int
+    name: str
+    channels: int
+    sample_rate: int
+    is_default: bool = False
+
+
+class DeviceListResponse(BaseModel):
+    items: list[DeviceInfo]
+    default_index: int | None = Field(default=None, description="系统默认输入设备序号")
+
+
+class RecordLevelMessage(BaseModel):
+    """/ws/record 推送的实时电平消息。"""
+
+    type: str = Field(default="level", description="消息类型：level / state")
+    recording: bool
+    elapsed: float
+    level: float = Field(default=0.0, description="RMS 电平")
+    peak: float = Field(default=0.0, description="峰值电平")
 
 
 class EffectInfo(BaseModel):
@@ -76,6 +103,43 @@ class ApplyEffectResponse(BaseModel):
     meta: AudioMeta
 
 
+class EffectStep(BaseModel):
+    """效果链中的一步。"""
+
+    effect: str = Field(description="效果器注册名")
+    params: dict = Field(default_factory=dict)
+
+
+class EffectChainRequest(BaseModel):
+    audio_id: str
+    steps: list[EffectStep] = Field(default_factory=list, description="按顺序施加的效果步骤")
+    save_as_new: bool = Field(default=True)
+
+
+class EffectChainResponse(BaseModel):
+    audio_id: str
+    meta: AudioMeta
+    applied: list[str] = Field(default_factory=list, description="实际执行的效果标题，便于回显")
+
+
+class EffectHistoryItem(BaseModel):
+    """处理历史中的一条记录。"""
+
+    effect: str
+    title: str
+    params: dict
+
+
+class EffectHistoryResponse(BaseModel):
+    audio_id: str
+    root_id: str = Field(description="链条起点（录音或上传）的 audio_id")
+    steps: list[EffectHistoryItem]
+
+
+class UndoRequest(BaseModel):
+    audio_id: str
+
+
 class SpectrumRequest(BaseModel):
     audio_id: str
     n_fft: int = Field(default=1024, ge=128, le=8192)
@@ -101,6 +165,24 @@ class WaveformResponse(BaseModel):
     points: int
     minimum: list[float]
     maximum: list[float]
+
+
+class SpectrogramResponse(BaseModel):
+    """语谱图（STFT 热力图）。
+
+    幅度矩阵量化为 0–255 的整数并以一维数组下发（行优先：time × freq），
+    前端用 ImageData 直接贴到 Canvas。相比下发浮点矩阵，体积缩小约 4 倍。
+    """
+
+    audio_id: str
+    sample_rate: int
+    times: list[float]
+    freqs: list[float]
+    frames: int
+    bins: int
+    data: list[int] = Field(description="长度 frames*bins，行优先，0 最弱 255 最强")
+    floor_db: float = Field(default=-80.0, description="量化下限 dB")
+    ceiling_db: float = Field(default=0.0, description="量化上限 dB")
 
 
 class AudioStatsResponse(BaseModel):

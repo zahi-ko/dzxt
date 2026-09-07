@@ -16,7 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 import server.core.effects  # noqa: F401  导入即触发效果器注册
-from server.api.routers import analysis, audio, effects
+from server.api.routers import analysis, audio, effects, realtime
 from server.core.registry import list_effects
 from server.schemas import ErrorResponse
 
@@ -42,6 +42,7 @@ app.add_middleware(
 app.include_router(audio.router)
 app.include_router(effects.router)
 app.include_router(analysis.router)
+app.include_router(realtime.router)
 
 
 @app.get("/api/health", tags=["system"], summary="健康检查")

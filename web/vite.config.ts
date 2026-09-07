@@ -12,6 +12,12 @@ export default defineConfig({
         target: 'http://127.0.0.1:8000',
         changeOrigin: true,
       },
+      // 录音电平走 WebSocket，同样转发到后端；ws: true 才会升级协议
+      '/ws': {
+        target: 'ws://127.0.0.1:8000',
+        ws: true,
+        changeOrigin: true,
+      },
     },
   },
   build: {

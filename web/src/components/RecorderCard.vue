@@ -1,46 +1,116 @@
 <script setup lang="ts">
-import { computed, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { api } from '../api'
-import type { AudioMeta } from '../api'
+import type { AudioMeta, DeviceInfo, RecordLevelMessage } from '../api'
 
 const emit = defineEmits<{
   recorded: [meta: AudioMeta]
   error: [message: string]
 }>()
 
-const SAMPLE_RATES = [8000, 16000, 22050, 44100, 48000]
+const SAMPLE_RATES = [16000, 44100, 48000]
+const CHANNEL_OPTIONS = [
+  { value: 1, label: '单声道' },
+  { value: 2, label: '立体声' },
+]
 
 const recording = ref(false)
 const elapsed = ref(0)
 const level = ref(0)
+const peak = ref(0)
 const sampleRate = ref(48000)
+const channels = ref(1)
+const devices = ref<DeviceInfo[]>([])
+const deviceIndex = ref<number | null>(null)
 const limitEnabled = ref(true)
 const limitSeconds = ref(5)
+const transport = ref<'idle' | 'ws' | 'poll'>('idle')
 const fileInput = ref<HTMLInputElement | null>(null)
 
 let timer: ReturnType<typeof setInterval> | null = null
+let socket: WebSocket | null = null
 
 function stopPolling() {
   if (timer) {
     clearInterval(timer)
     timer = null
   }
+  if (transport.value === 'poll') transport.value = 'idle'
 }
 
 function startPolling() {
-  stopPolling()
+  if (timer) return
+  transport.value = 'poll'
   timer = setInterval(async () => {
     try {
       const status = await api.recordStatus()
       elapsed.value = status.elapsed
       level.value = status.level
-      if (!status.recording && recording.value) {
-        await finish()
-      }
+      if (!status.recording && recording.value) await finish()
     } catch (error) {
       emit('error', (error as Error).message)
     }
   }, 300)
+}
+
+function closeSocket() {
+  if (socket) {
+    socket.onclose = null
+    socket.onerror = null
+    socket.onmessage = null
+    socket.onopen = null
+    socket.close()
+    socket = null
+  }
+  if (transport.value === 'ws') transport.value = 'idle'
+}
+
+// WebSocket 优先：连续电平比 300ms 轮询顺滑得多。
+// 连不上（代理未升级、后端不支持）时自动退回轮询，功能不降级。
+function openSocket() {
+  closeSocket()
+  let url = ''
+  try {
+    url = api.recordLevelSocketUrl()
+    socket = new WebSocket(url)
+  } catch {
+    startPolling()
+    return
+  }
+
+  socket.onopen = () => {
+    transport.value = 'ws'
+    stopPolling()
+  }
+  socket.onmessage = (event: MessageEvent<string>) => {
+    try {
+      const message = JSON.parse(event.data) as RecordLevelMessage
+      transport.value = 'ws'
+      elapsed.value = message.elapsed
+      level.value = message.level
+      peak.value = message.peak
+      if (!message.recording && recording.value) void finish()
+    } catch {
+      // 非预期消息，忽略
+    }
+  }
+  socket.onerror = () => {
+    if (recording.value) startPolling()
+  }
+  socket.onclose = () => {
+    socket = null
+    if (recording.value) startPolling()
+  }
+}
+
+async function loadDevices() {
+  try {
+    const result = await api.devices()
+    devices.value = result.items
+    if (deviceIndex.value === null) deviceIndex.value = result.default_index
+  } catch (error) {
+    emit('error', (error as Error).message)
+  }
 }
 
 async function start() {
@@ -48,23 +118,30 @@ async function start() {
     await api.startRecord({
       duration: limitEnabled.value ? Number(limitSeconds.value) : null,
       sampleRate: Number(sampleRate.value),
+      channels: Number(channels.value),
+      device: deviceIndex.value,
     })
     recording.value = true
     elapsed.value = 0
     level.value = 0
-    startPolling()
+    peak.value = 0
+    openSocket()
+    startPolling() // 兜底：WS 连上后会被停止
   } catch (error) {
+    recording.value = false
     emit('error', (error as Error).message)
   }
 }
 
 async function finish() {
   stopPolling()
+  closeSocket()
   try {
     const meta = await api.stopRecord()
     recording.value = false
     elapsed.value = 0
     level.value = 0
+    peak.value = 0
     emit('recorded', meta)
   } catch (error) {
     recording.value = false
@@ -88,8 +165,17 @@ async function upload(event: Event) {
 
 // RMS 语音电平通常落在 0~0.3，放大后更适合作为视觉指示
 const levelPercent = computed(() => Math.min(100, Math.round(level.value * 320)))
+const peakPercent = computed(() => Math.min(100, Math.round(peak.value * 320)))
+const transportHint = computed(() => {
+  if (!recording.value) return ''
+  return transport.value === 'ws' ? '实时电平 · WebSocket' : '实时电平 · 轮询'
+})
 
-onUnmounted(stopPolling)
+onMounted(loadDevices)
+onUnmounted(() => {
+  stopPolling()
+  closeSocket()
+})
 </script>
 
 <template>
@@ -100,9 +186,28 @@ onUnmounted(stopPolling)
     </h2>
 
     <div class="row">
+      <label>设备</label>
+      <select v-model="deviceIndex" :disabled="recording">
+        <option :value="null">系统默认</option>
+        <option v-for="device in devices" :key="device.index" :value="device.index">
+          {{ device.name }}（{{ device.channels }}ch）
+        </option>
+      </select>
+    </div>
+
+    <div class="row">
       <label>采样率</label>
       <select v-model.number="sampleRate" :disabled="recording">
         <option v-for="rate in SAMPLE_RATES" :key="rate" :value="rate">{{ rate }} Hz</option>
+      </select>
+    </div>
+
+    <div class="row">
+      <label>声道</label>
+      <select v-model.number="channels" :disabled="recording">
+        <option v-for="option in CHANNEL_OPTIONS" :key="option.value" :value="option.value">
+          {{ option.label }}
+        </option>
       </select>
     </div>
 
@@ -123,7 +228,12 @@ onUnmounted(stopPolling)
 
     <div class="meter">
       <div class="meter-fill" :style="{ width: levelPercent + '%' }"></div>
+      <div class="meter-peak" :style="{ left: peakPercent + '%' }"></div>
     </div>
+    <p class="hint meter-hint">
+      RMS {{ level.toFixed(4) }} · 峰值 {{ peak.toFixed(4) }}
+      <span v-if="transportHint" class="dim">{{ transportHint }}</span>
+    </p>
 
     <div class="actions">
       <button v-if="!recording" class="primary" @click="start">开始录音</button>
@@ -146,6 +256,16 @@ onUnmounted(stopPolling)
   flex: 0 0 56px;
 }
 
+.row select,
+.row input[type='number'] {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.row input[type='number'] {
+  max-width: 90px;
+}
+
 .check {
   display: flex;
   align-items: center;
@@ -153,18 +273,34 @@ onUnmounted(stopPolling)
 }
 
 .meter {
+  position: relative;
   height: 8px;
   background: #12151c;
   border: 1px solid var(--border);
   border-radius: 4px;
   overflow: hidden;
-  margin-bottom: 12px;
+  margin-bottom: 6px;
 }
 
 .meter-fill {
   height: 100%;
   background: linear-gradient(90deg, var(--teal), var(--accent));
-  transition: width 0.12s linear;
+  transition: width 0.08s linear;
+}
+
+.meter-peak {
+  position: absolute;
+  top: 0;
+  width: 2px;
+  height: 100%;
+  background: var(--danger);
+}
+
+.meter-hint {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 12px;
 }
 
 .actions {
@@ -175,5 +311,9 @@ onUnmounted(stopPolling)
 .rec-dot {
   font-size: 12px;
   color: var(--danger);
+}
+
+.dim {
+  color: var(--text-dim);
 }
 </style>

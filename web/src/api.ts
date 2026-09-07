@@ -25,6 +25,28 @@ export interface RecordStatusResponse {
   level: number
 }
 
+export interface DeviceInfo {
+  index: number
+  name: string
+  channels: number
+  sample_rate: number
+  is_default: boolean
+}
+
+export interface DeviceListResponse {
+  items: DeviceInfo[]
+  default_index: number | null
+}
+
+/** /ws/record 推送的实时电平消息 */
+export interface RecordLevelMessage {
+  type: string
+  recording: boolean
+  elapsed: number
+  level: number
+  peak: number
+}
+
 export interface EffectInfo {
   name: string
   title: string
@@ -115,13 +137,28 @@ export const api = {
     form.append('file', file)
     return request<AudioMeta>('/audio/upload', { method: 'POST', body: form })
   },
-  startRecord: (options: { duration?: number | null; sampleRate?: number } = {}) =>
+  devices: () => request<DeviceListResponse>('/audio/devices'),
+  startRecord: (
+    options: {
+      duration?: number | null
+      sampleRate?: number
+      channels?: number
+      device?: number | null
+    } = {}
+  ) =>
     post<RecordStatusResponse>('/audio/record/start', {
       duration: options.duration ?? null,
-      sample_rate: options.sampleRate ?? 16000,
+      sample_rate: options.sampleRate ?? 48000,
+      channels: options.channels ?? 1,
+      device: options.device ?? null,
     }),
   stopRecord: () => post<AudioMeta>('/audio/record/stop'),
   recordStatus: () => request<RecordStatusResponse>('/audio/record/status'),
+  /** 录音电平 WebSocket 地址。同源访问（生产态或 Vite 代理生效时）即可直连。 */
+  recordLevelSocketUrl: () => {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    return `${protocol}//${window.location.host}/ws/record`
+  },
 
   play: (audioId: string) => post<null>(`/audio/${audioId}/play`),
   stopPlay: () => post<null>('/audio/play/stop'),
