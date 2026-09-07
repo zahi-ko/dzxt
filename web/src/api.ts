@@ -79,6 +79,18 @@ export interface SpectrumResponse {
   magnitude_db: number[]
 }
 
+export interface SpectrogramResponse {
+  audio_id: string
+  sample_rate: number
+  times: number[]
+  freqs: number[]
+  frames: number
+  bins: number
+  data: number[]
+  floor_db: number
+  ceiling_db: number
+}
+
 export interface AudioStatsResponse {
   audio_id: string
   sample_rate: number
@@ -184,6 +196,12 @@ export const api = {
 
   spectrum: (audioId: string, nFft = 2048) =>
     post<SpectrumResponse>('/analysis/spectrum', { audio_id: audioId, n_fft: nFft }),
+  spectrogram: (audioId: string, nFft = 512, maxFrames = 480) =>
+    post<SpectrogramResponse>('/analysis/spectrogram', {
+      audio_id: audioId,
+      n_fft: nFft,
+      max_frames: maxFrames,
+    }),
   stats: (audioId: string) => request<AudioStatsResponse>(`/analysis/${audioId}/stats`),
 }
 

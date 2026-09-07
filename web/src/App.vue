@@ -6,12 +6,15 @@ import type {
   AudioMeta,
   AudioStatsResponse,
   EffectInfo,
+  SpectrogramResponse,
   SpectrumResponse,
   WaveformResponse,
 } from './api'
+import AudioInfo from './components/AudioInfo.vue'
 import AudioLibrary from './components/AudioLibrary.vue'
 import EffectPanel from './components/EffectPanel.vue'
 import RecorderCard from './components/RecorderCard.vue'
+import SpectrogramCanvas from './components/SpectrogramCanvas.vue'
 import SpectrumCanvas from './components/SpectrumCanvas.vue'
 import WaveformCanvas from './components/WaveformCanvas.vue'
 
@@ -32,7 +35,20 @@ const spectrum = ref<SpectrumResponse>({
   freqs: [],
   magnitude_db: [],
 })
+const spectrogram = ref<SpectrogramResponse>({
+  audio_id: '',
+  sample_rate: 0,
+  times: [],
+  freqs: [],
+  frames: 0,
+  bins: 0,
+  data: [],
+  floor_db: -80,
+  ceiling_db: 0,
+})
 const stats = ref<AudioStatsResponse | null>(null)
+const selection = ref<{ start: number; end: number } | null>(null)
+const playhead = ref(-1)
 const errorMessage = ref('')
 const online = ref(false)
 
@@ -43,10 +59,24 @@ function showError(message: string) {
   }, 6000)
 }
 
+const EMPTY_SPECTROGRAM: SpectrogramResponse = {
+  audio_id: '',
+  sample_rate: 0,
+  times: [],
+  freqs: [],
+  frames: 0,
+  bins: 0,
+  data: [],
+  floor_db: -80,
+  ceiling_db: 0,
+}
+
 function clearAnalysis() {
   peaks.value = { audio_id: '', sample_rate: 0, duration: 0, points: 0, minimum: [], maximum: [] }
   spectrum.value = { audio_id: '', sample_rate: 0, freqs: [], magnitude_db: [] }
+  spectrogram.value = { ...EMPTY_SPECTROGRAM }
   stats.value = null
+  selection.value = null
 }
 
 async function refreshAudios() {
@@ -58,20 +88,43 @@ async function refreshEffects() {
 }
 
 async function loadAnalysis(audioId: string) {
-  const [envelope, freqData, statistics] = await Promise.all([
+  const [envelope, freqData, statistics, spectro] = await Promise.all([
     api.peaks(audioId, 2000),
     api.spectrum(audioId, 2048),
     api.stats(audioId),
+    api.spectrogram(audioId, 512, 480),
   ])
   peaks.value = envelope
   spectrum.value = freqData
   stats.value = statistics
+  spectrogram.value = spectro
+  selection.value = null
 }
 
 async function selectAudio(audioId: string) {
   selectedId.value = audioId
   try {
     await loadAnalysis(audioId)
+  } catch (error) {
+    showError((error as Error).message)
+  }
+}
+
+// 选区裁剪：把波形上框选的时间区间直接交给 trim 效果器，
+// 复用效果链与处理历史，不必另开一套裁剪逻辑。
+async function trimToSelection() {
+  if (!selectedId.value || !selection.value) return
+  try {
+    const result = await api.applyEffect({
+      audioId: selectedId.value,
+      effect: 'trim',
+      params: {
+        start_sec: Number(selection.value.start.toFixed(4)),
+        end_sec: Number(selection.value.end.toFixed(4)),
+      },
+      saveAsNew: true,
+    })
+    await handleApplied(result)
   } catch (error) {
     showError((error as Error).message)
   }
@@ -151,21 +204,32 @@ onMounted(async () => {
         <div class="panel">
           <h2 class="panel-title">
             波形
-            <span v-if="stats" class="hint mono">
-              {{ stats.duration.toFixed(2) }}s · {{ stats.sample_rate }} Hz ·
-              RMS {{ stats.rms.toFixed(4) }} · 峰值 {{ stats.peak.toFixed(4) }}
-            </span>
+            <button class="mini" :disabled="!selection" @click="trimToSelection">裁剪选区</button>
           </h2>
           <WaveformCanvas
+            v-model:selection="selection"
             :minimum="peaks.minimum"
             :maximum="peaks.maximum"
             :duration="peaks.duration"
+            :playhead="playhead"
           />
+          <AudioInfo :stats="stats" />
         </div>
 
         <div class="panel">
-          <h2 class="panel-title">频谱</h2>
+          <h2 class="panel-title">频谱（FFT 平均幅度谱）</h2>
           <SpectrumCanvas :freqs="spectrum.freqs" :magnitude-db="spectrum.magnitude_db" />
+        </div>
+
+        <div class="panel">
+          <h2 class="panel-title">语谱图（STFT 时频图）</h2>
+          <SpectrogramCanvas
+            :frames="spectrogram.frames"
+            :bins="spectrogram.bins"
+            :data="spectrogram.data"
+            :times="spectrogram.times"
+            :freqs="spectrogram.freqs"
+          />
         </div>
       </section>
 

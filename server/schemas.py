@@ -167,6 +167,14 @@ class WaveformResponse(BaseModel):
     maximum: list[float]
 
 
+class SpectrogramRequest(BaseModel):
+    audio_id: str
+    n_fft: int = Field(default=512, ge=128, le=2048)
+    max_frames: int = Field(default=480, ge=60, le=1200, description="最大时间帧数，超出则自动加大 hop")
+    floor_db: float = Field(default=-80.0, ge=-200.0, le=0.0)
+    ceiling_db: float = Field(default=0.0, ge=-100.0, le=60.0)
+
+
 class SpectrogramResponse(BaseModel):
     """语谱图（STFT 热力图）。
 

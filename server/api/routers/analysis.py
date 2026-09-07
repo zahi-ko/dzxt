@@ -5,8 +5,15 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 from server.api.deps import require_entry
+from server.core.analysis.spectrogram import quantize_db, stft_magnitude_db
 from server.core.analysis.spectrum import average_spectrum, peak_level, rms_level
-from server.schemas import AudioStatsResponse, SpectrumRequest, SpectrumResponse
+from server.schemas import (
+    AudioStatsResponse,
+    SpectrogramRequest,
+    SpectrogramResponse,
+    SpectrumRequest,
+    SpectrumResponse,
+)
 
 router = APIRouter(prefix="/api/analysis", tags=["analysis"])
 
@@ -21,6 +28,30 @@ def spectrum(request: SpectrumRequest) -> SpectrumResponse:
         sample_rate=entry.sample_rate,
         freqs=freqs.tolist(),
         magnitude_db=magnitude_db.tolist(),
+    )
+
+
+@router.post("/spectrogram", response_model=SpectrogramResponse, summary="计算语谱图（STFT 热力图）")
+def spectrogram(request: SpectrogramRequest) -> SpectrogramResponse:
+    entry = require_entry(request.audio_id)
+    magnitude_db, times, freqs = stft_magnitude_db(
+        entry.data,
+        entry.sample_rate,
+        n_fft=request.n_fft,
+        max_frames=request.max_frames,
+    )
+    quantized = quantize_db(magnitude_db, request.floor_db, request.ceiling_db)
+
+    return SpectrogramResponse(
+        audio_id=request.audio_id,
+        sample_rate=entry.sample_rate,
+        times=times.tolist(),
+        freqs=freqs.tolist(),
+        frames=int(quantized.shape[0]),
+        bins=int(quantized.shape[1]),
+        data=quantized.reshape(-1).tolist(),
+        floor_db=request.floor_db,
+        ceiling_db=request.ceiling_db,
     )
 
 
