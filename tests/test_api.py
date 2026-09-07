@@ -6,6 +6,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 import pytest
 from fastapi.testclient import TestClient
@@ -265,4 +267,66 @@ def test_stream_is_inline_wav(client: TestClient) -> None:
     assert response.status_code == 200
     assert response.headers["content-type"] == "audio/wav"
     assert "inline" in response.headers["content-disposition"]
+    assert response.headers["accept-ranges"] == "bytes"
     assert response.content[:4] == b"RIFF"
+
+
+def test_stream_supports_range_requests(client: TestClient) -> None:
+    """浏览器 media 元素依赖 206 响应做 seek；缺失时拖动进度条/单击定位失效。"""
+    audio_id = upload(client)
+    full = client.get(f"/api/audio/{audio_id}/stream").content
+    total = len(full)
+
+    # bytes=start-end
+    response = client.get(f"/api/audio/{audio_id}/stream", headers={"Range": "bytes=100-199"})
+    assert response.status_code == 206
+    assert response.headers["content-range"] == f"bytes 100-199/{total}"
+    assert response.content == full[100:200]
+
+    # bytes=start-（开放式结尾）
+    response = client.get(f"/api/audio/{audio_id}/stream", headers={"Range": "bytes=0-"})
+    assert response.status_code == 206
+    assert response.content == full
+
+    # bytes=-N（后缀范围）
+    response = client.get(f"/api/audio/{audio_id}/stream", headers={"Range": "bytes=-4410"})
+    assert response.status_code == 206
+    assert response.content == full[-4410:]
+
+    # 起点越界
+    response = client.get(f"/api/audio/{audio_id}/stream", headers={"Range": f"bytes={total}-"})
+    assert response.status_code == 416
+    assert response.headers["content-range"] == f"bytes */{total}"
+
+
+def test_upload_mp3(client: TestClient) -> None:
+    """mp3 上传解码。测试音频不入库（.gitignore），缺失时跳过。"""
+    mp3_path = Path(__file__).parent / "test_short.mp3"
+    if not mp3_path.exists():
+        pytest.skip("测试音频 test_short.mp3 不存在")
+    response = client.post(
+        "/api/audio/upload",
+        files={"file": ("test_short.mp3", mp3_path.read_bytes(), "audio/mpeg")},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["sample_rate"] == 44100
+    assert body["channels"] == 2
+    assert body["duration"] == pytest.approx(30.0, abs=0.5)
+
+
+def test_load_audio_tolerates_mp3_tail_overclaim(client: TestClient) -> None:
+    """VBR mp3 头部声明的帧数常大于实际可解码帧数，尾部读取会抛错误码 29。
+
+    回归测试：解码应保留成功部分而不是整体失败。test.mp3（11 分钟原片）
+    正是这种文件；缺失时跳过。
+    """
+    mp3_path = Path(__file__).parent / "test.mp3"
+    if not mp3_path.exists():
+        pytest.skip("测试音频 test.mp3 不存在")
+    from server.core.io.audio_file import load_audio
+
+    data, sample_rate = load_audio(mp3_path.read_bytes())
+    assert sample_rate == 44100
+    # 实际可解码约 270.5s；声明 271.8s，尾部约 1s 坏帧被截断
+    assert data.shape[0] > 44100 * 260

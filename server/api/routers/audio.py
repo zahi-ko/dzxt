@@ -5,7 +5,10 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, File, HTTPException, Query, UploadFile
+import re
+from datetime import datetime
+
+from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile
 from fastapi.responses import Response
 
 from server.api.deps import require_entry
@@ -23,6 +26,47 @@ from server.schemas import (
 from server.session_store import get_store
 
 router = APIRouter(prefix="/api/audio", tags=["audio"])
+
+_RANGE_PATTERN = re.compile(r"bytes=(\d*)-(\d*)")
+
+
+def _serve_wav(request: Request, wav: bytes, audio_id: str, disposition: str) -> Response:
+    """按 HTTP Range 语义返回 WAV 字节。
+
+    没有 Range 支持（206 分段响应）时，浏览器会把流视为不可 seek，
+    波形单击定位与进度条拖动都会失效——游标被 timeupdate 拉回原位。
+    """
+    headers = {
+        "Accept-Ranges": "bytes",
+        "Content-Disposition": f'{disposition}; filename="{audio_id}.wav"',
+    }
+    match = _RANGE_PATTERN.fullmatch(request.headers.get("range", "").strip())
+    if not match:
+        return Response(content=wav, media_type="audio/wav", headers=headers)
+
+    total = len(wav)
+    start_text, end_text = match.groups()
+    if start_text == "":
+        # bytes=-N：取最后 N 字节
+        start = max(0, total - int(end_text))
+        end = total - 1
+    else:
+        start = int(start_text)
+        end = int(end_text) if end_text else total - 1
+
+    if start >= total or start > end:
+        return Response(
+            status_code=416,
+            headers={**headers, "Content-Range": f"bytes */{total}"},
+        )
+
+    end = min(end, total - 1)
+    return Response(
+        content=wav[start : end + 1],
+        status_code=206,
+        media_type="audio/wav",
+        headers={**headers, "Content-Range": f"bytes {start}-{end}/{total}"},
+    )
 
 
 @router.get("", response_model=AudioListResponse, summary="列出全部音频句柄")
@@ -92,7 +136,9 @@ def stop_record() -> AudioMeta:
     if data.size == 0:
         raise HTTPException(status_code=422, detail="未采集到音频数据，请检查麦克风设备")
 
-    entry = get_store().put(data, sample_rate, label="录音")
+    # 多次录音全叫「录音」无法区分，用结束时刻命名
+    label = f"录音 {datetime.now():%H:%M:%S}"
+    entry = get_store().put(data, sample_rate, label=label)
     return entry.to_meta()
 
 
@@ -131,19 +177,18 @@ def stop_play() -> Response:
 
 
 @router.get("/{audio_id}/stream", summary="以 WAV 流形式返回音频，供前端播放器直接播放")
-def stream_audio(audio_id: str) -> Response:
+def stream_audio(audio_id: str, request: Request) -> Response:
     """与 download 的区别只有 Content-Disposition：这里是 inline，浏览器直接播放。
+
+    支持 HTTP Range（206）：浏览器 media 元素依赖它做 seek，
+    缺失时单击定位与拖动进度条都不会生效。
 
     前端播放是必要的：sounddevice 的 sd.play 拿不到播放位置，
     做不了进度条、暂停续播与变速，见 docs/adr/0007-frontend-playback.md。
     """
     entry = require_entry(audio_id)
     wav = dump_audio(entry.data, entry.sample_rate)
-    return Response(
-        content=wav,
-        media_type="audio/wav",
-        headers={"Content-Disposition": f'inline; filename="{audio_id}.wav"'},
-    )
+    return _serve_wav(request, wav, audio_id, disposition="inline")
 
 
 @router.get("/{audio_id}/download", summary="导出为 WAV")

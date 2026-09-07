@@ -62,6 +62,8 @@ function onEnded() {
 }
 
 function onError() {
+  // 未选中音频时 src 属性不存在，理论上不会有 error；防御性兜底
+  if (!props.audioId) return
   playing.value = false
   emit('error', '音频加载失败，请确认后端仍在运行')
 }
@@ -161,7 +163,7 @@ defineExpose({ seek, play, pause, stop })
   <section class="player">
     <audio
       ref="audioA"
-      :src="streamUrl"
+      :src="streamUrl || undefined"
       @timeupdate="onTimeUpdate"
       @loadedmetadata="onLoaded"
       @ended="onEnded"
