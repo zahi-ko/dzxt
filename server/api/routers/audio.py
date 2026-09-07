@@ -6,7 +6,6 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime
 
 from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile
 from fastapi.responses import Response
@@ -67,6 +66,20 @@ def _serve_wav(request: Request, wav: bytes, audio_id: str, disposition: str) ->
         media_type="audio/wav",
         headers={**headers, "Content-Range": f"bytes {start}-{end}/{total}"},
     )
+
+
+def _next_recording_label() -> str:
+    """按会话内序号给录音命名：录音 1、录音 2……
+
+    序号取现有「录音 N」前缀的最大值 + 1，删除不回收序号；
+    带血统的效果产物（「录音 N → 效果」）也占用序号，避免重名。
+    """
+    numbers = [
+        int(m.group(1))
+        for entry in get_store().list()
+        if (m := re.match(r"^录音 (\d+)", entry.label)) is not None
+    ]
+    return f"录音 {max(numbers, default=0) + 1}"
 
 
 @router.get("", response_model=AudioListResponse, summary="列出全部音频句柄")
@@ -136,9 +149,7 @@ def stop_record() -> AudioMeta:
     if data.size == 0:
         raise HTTPException(status_code=422, detail="未采集到音频数据，请检查麦克风设备")
 
-    # 多次录音全叫「录音」无法区分，用结束时刻命名
-    label = f"录音 {datetime.now():%H:%M:%S}"
-    entry = get_store().put(data, sample_rate, label=label)
+    entry = get_store().put(data, sample_rate, label=_next_recording_label())
     return entry.to_meta()
 
 

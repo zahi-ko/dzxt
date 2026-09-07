@@ -330,3 +330,16 @@ def test_load_audio_tolerates_mp3_tail_overclaim(client: TestClient) -> None:
     assert sample_rate == 44100
     # 实际可解码约 270.5s；声明 271.8s，尾部约 1s 坏帧被截断
     assert data.shape[0] > 44100 * 260
+
+
+def test_recording_labels_are_numbered(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    """多次录音按会话内序号命名（录音 1、录音 2…），不用时间戳。"""
+
+    class FakeRecorder:
+        def stop(self) -> tuple[np.ndarray, int]:
+            return np.zeros(8000, dtype=np.float32), 16000
+
+    monkeypatch.setattr("server.api.routers.audio.get_recorder", lambda: FakeRecorder())
+
+    labels = [client.post("/api/audio/record/stop").json()["label"] for _ in range(3)]
+    assert labels == ["录音 1", "录音 2", "录音 3"]
