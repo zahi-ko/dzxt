@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import { api } from './api'
 import type {
   ApplyEffectResponse,
   AudioMeta,
   AudioStatsResponse,
   EffectInfo,
+  EffectHistoryResponse,
   SpectrogramResponse,
   SpectrumResponse,
   WaveformResponse,
@@ -15,6 +16,7 @@ import AudioLibrary from './components/AudioLibrary.vue'
 import EffectChainPanel from './components/EffectChainPanel.vue'
 import EffectPanel from './components/EffectPanel.vue'
 import HistoryPanel from './components/HistoryPanel.vue'
+import PlayerBar from './components/PlayerBar.vue'
 import RecorderCard from './components/RecorderCard.vue'
 import SpectrogramCanvas from './components/SpectrogramCanvas.vue'
 import SpectrumCanvas from './components/SpectrumCanvas.vue'
@@ -49,10 +51,10 @@ const spectrogram = ref<SpectrogramResponse>({
   ceiling_db: 0,
 })
 const stats = ref<AudioStatsResponse | null>(null)
+const history = ref<EffectHistoryResponse | null>(null)
 const selection = ref<{ start: number; end: number } | null>(null)
 const playhead = ref(-1)
-// 处理后自增，驱动处理历史面板重新拉取
-const historyToken = ref(0)
+const player = ref<InstanceType<typeof PlayerBar> | null>(null)
 const errorMessage = ref('')
 const online = ref(false)
 
@@ -80,6 +82,7 @@ function clearAnalysis() {
   spectrum.value = { audio_id: '', sample_rate: 0, freqs: [], magnitude_db: [] }
   spectrogram.value = { ...EMPTY_SPECTROGRAM }
   stats.value = null
+  history.value = null
   selection.value = null
 }
 
@@ -92,16 +95,18 @@ async function refreshEffects() {
 }
 
 async function loadAnalysis(audioId: string) {
-  const [envelope, freqData, statistics, spectro] = await Promise.all([
+  const [envelope, freqData, statistics, spectro, effectHistory] = await Promise.all([
     api.peaks(audioId, 2000),
     api.spectrum(audioId, 2048),
     api.stats(audioId),
     api.spectrogram(audioId, 512, 480),
+    api.history(audioId),
   ])
   peaks.value = envelope
   spectrum.value = freqData
   stats.value = statistics
   spectrogram.value = spectro
+  history.value = effectHistory
   selection.value = null
 }
 
@@ -116,6 +121,13 @@ async function selectAudio(audioId: string) {
 
 // 选区裁剪：把波形上框选的时间区间直接交给 trim 效果器，
 // 复用效果链与处理历史，不必另开一套裁剪逻辑。
+async function playFromLibrary(audioId: string) {
+  await selectAudio(audioId)
+  // 等 audio 元素的 src 绑定刷新后再播，否则播的还是上一条
+  await nextTick()
+  player.value?.play()
+}
+
 async function trimToSelection() {
   if (!selectedId.value || !selection.value) return
   try {
@@ -147,7 +159,6 @@ async function handleApplied(result: ApplyEffectResponse) {
   try {
     await refreshAudios()
     await selectAudio(result.audio_id)
-    historyToken.value += 1
   } catch (error) {
     showError((error as Error).message)
   }
@@ -193,6 +204,16 @@ onMounted(async () => {
 
     <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
 
+    <PlayerBar
+      ref="player"
+      class="player-bar"
+      :audio-id="selectedId"
+      :baseline-id="history?.root_id ?? ''"
+      :duration="peaks.duration"
+      @playhead="playhead = $event"
+      @error="showError"
+    />
+
     <main class="layout">
       <aside class="col">
         <RecorderCard @recorded="handleRecorded" @error="showError" />
@@ -200,6 +221,7 @@ onMounted(async () => {
           :items="audios"
           :selected-id="selectedId"
           @select="selectAudio"
+          @play="playFromLibrary"
           @removed="handleRemoved"
           @error="showError"
         />
@@ -217,6 +239,7 @@ onMounted(async () => {
             :maximum="peaks.maximum"
             :duration="peaks.duration"
             :playhead="playhead"
+            @seek="player?.seek($event)"
           />
           <AudioInfo :stats="stats" />
         </div>
@@ -253,7 +276,7 @@ onMounted(async () => {
         />
         <HistoryPanel
           :audio-id="selectedId"
-          :reload-token="historyToken"
+          :history="history"
           @navigate="selectAudio"
           @error="showError"
         />
@@ -299,6 +322,10 @@ h1 {
   background: rgba(239, 107, 107, 0.08);
   color: var(--danger);
   font-size: 13px;
+}
+
+.player-bar {
+  margin-bottom: 16px;
 }
 
 .layout {

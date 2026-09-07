@@ -197,6 +197,7 @@ export const api = {
   remove: (audioId: string) =>
     request<null>(`/audio/${audioId}`, { method: 'DELETE' }),
   downloadUrl: (audioId: string) => `${BASE}/audio/${audioId}/download`,
+  streamUrl: (audioId: string) => `${BASE}/audio/${audioId}/stream`,
 
   listEffects: () => request<EffectListResponse>('/effects'),
   applyEffect: (options: {

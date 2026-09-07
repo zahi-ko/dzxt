@@ -9,6 +9,7 @@ defineProps<{
 
 const emit = defineEmits<{
   select: [audioId: string]
+  play: [audioId: string]
   removed: [audioId: string]
   error: [message: string]
 }>()
@@ -26,20 +27,10 @@ async function remove(audioId: string) {
   }
 }
 
-async function play(audioId: string) {
-  try {
-    await api.play(audioId)
-  } catch (error) {
-    emit('error', (error as Error).message)
-  }
-}
-
-async function stopAll() {
-  try {
-    await api.stopPlay()
-  } catch (error) {
-    emit('error', (error as Error).message)
-  }
+// 播放统一交给底部播放器：列表里只负责"选中并播放"，
+// 避免出现两套播放器导致进度条与列表状态不同步。
+function play(audioId: string) {
+  emit('play', audioId)
 }
 </script>
 
@@ -47,7 +38,7 @@ async function stopAll() {
   <section class="panel">
     <h2 class="panel-title">
       音频列表
-      <button class="mini" @click="stopAll">停止播放</button>
+      <span class="hint">{{ items.length }} 条</span>
     </h2>
 
     <p v-if="items.length === 0" class="hint">还没有音频</p>

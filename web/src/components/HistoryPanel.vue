@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref } from 'vue'
 import { api } from '../api'
 import type { EffectHistoryResponse } from '../api'
 
@@ -8,11 +8,11 @@ import type { EffectHistoryResponse } from '../api'
 const props = withDefaults(
   defineProps<{
     audioId: string
-    reloadToken?: number
+    history: EffectHistoryResponse | null
   }>(),
   {
     audioId: '',
-    reloadToken: 0,
+    history: null,
   }
 )
 
@@ -21,7 +21,6 @@ const emit = defineEmits<{
   error: [message: string]
 }>()
 
-const history = ref<EffectHistoryResponse | null>(null)
 const busy = ref(false)
 
 function formatParams(params: Record<string, unknown>): string {
@@ -33,18 +32,6 @@ function formatParams(params: Record<string, unknown>): string {
       return `${key}=${text}`
     })
     .join('，')
-}
-
-async function load() {
-  if (!props.audioId) {
-    history.value = null
-    return
-  }
-  try {
-    history.value = await api.history(props.audioId)
-  } catch (error) {
-    emit('error', (error as Error).message)
-  }
 }
 
 async function undo() {
@@ -60,7 +47,6 @@ async function undo() {
   }
 }
 
-watch(() => [props.audioId, props.reloadToken], load, { immediate: true })
 </script>
 
 <template>

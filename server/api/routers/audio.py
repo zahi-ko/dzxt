@@ -130,6 +130,22 @@ def stop_play() -> Response:
     return Response(status_code=204)
 
 
+@router.get("/{audio_id}/stream", summary="以 WAV 流形式返回音频，供前端播放器直接播放")
+def stream_audio(audio_id: str) -> Response:
+    """与 download 的区别只有 Content-Disposition：这里是 inline，浏览器直接播放。
+
+    前端播放是必要的：sounddevice 的 sd.play 拿不到播放位置，
+    做不了进度条、暂停续播与变速，见 docs/adr/0007-frontend-playback.md。
+    """
+    entry = require_entry(audio_id)
+    wav = dump_audio(entry.data, entry.sample_rate)
+    return Response(
+        content=wav,
+        media_type="audio/wav",
+        headers={"Content-Disposition": f'inline; filename="{audio_id}.wav"'},
+    )
+
+
 @router.get("/{audio_id}/download", summary="导出为 WAV")
 def download_audio(audio_id: str) -> Response:
     entry = require_entry(audio_id)
