@@ -468,11 +468,14 @@ uv run python -m server.main           # 后端 :8000
 cd web && npm install && npm run dev   # 前端 :5173（代理 /api → 8000）
 ```
 
-### 9.2 一键环境初始化
+### 9.2 环境初始化
+
+没有一键脚本（原 `scripts/setup.ps1` 已于 2026-09-07 删除），按 AGENT.md §3 逐步执行：
 
 ```bash
-powershell -ExecutionPolicy Bypass -File scripts\setup.ps1
-# 依次：检查 uv/node → uv sync → npm install → ruff/pytest → 麦克风探测（缺失不中断）
+uv sync                 # 首次或依赖变更后：后端依赖
+cd web && npm install   # 首次：前端依赖
+uv run ruff check . && uv run pytest && uv run python scripts/smoke.py
 ```
 
 ### 9.3 一键打包
@@ -541,7 +544,7 @@ I/O         server/core/io/device.py         (Recorder / Player)
 入口        server/main.py                   (含冻结探测)
 打包入口    packaging/app.py                 packaging/app.spec
 打包脚本    scripts/build_release.ps1
-环境脚本    scripts/setup.ps1
+冒烟脚本    scripts/smoke.py
 前端入口    web/src/main.ts                  web/src/App.vue
 测试        tests/test_api.py                tests/test_effects.py
 配置        pyproject.toml                   web/vite.config.ts            web/package.json

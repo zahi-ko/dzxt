@@ -55,8 +55,9 @@
    答辩要主动讲。真要改善得换成最小值追踪（minimum statistics），暂时不做。
 3. **撤销依赖父句柄还在**：父句柄被删会返回 409 并提示。若要更稳，需要存快照，
    代价是内存与复杂度，暂不做。
-4. **`scripts/setup.ps1` 处于已删除未提交状态**（非本次改动，开工前就存在）。
-   本次提交未带它，需要用户决定恢复还是正式删除并补 scripts/README。
+4. ~~`scripts/setup.ps1` 处于已删除未提交状态~~ → 已由用户确认正式删除（提交 `chore(scripts)`）；
+   原因：受限终端下定位 uv/node 频繁失败，维护成本高于收益，环境初始化回归 AGENT.md §3 显式命令。
+   `scripts/` 现只保留 `build_release.ps1` 与 `smoke.py`。
 5. `web/dist` 已重新构建，重新打包 release 时记得跑 `scripts/build_release.ps1`。
 
 ## 下一个 session 从哪里接手

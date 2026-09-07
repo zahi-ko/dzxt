@@ -286,7 +286,7 @@ uv run python scripts/smoke.py   # 端到端冒烟：采集→显示→处理→
 - [x] 拓展功能范围确定（2026-09-06）：语音克隆 + 录音质量检测 + 语音加噪与降噪，共三项必做（ADR 0006）
 - [x] 契约层 `server/schemas.py` 与 `session_store.py`（2026-09-02）
 - [x] 1.3 接口骨架全部条目（2026-09-02）：注册表与基础效果、音频 I/O、main.py 与三个路由、Vue 3 + TS 前端、前后端联调（真实麦克风录音 → 波形 → 播放 → 效果 → 下载全链路验证通过）
-- [x] `scripts/setup.ps1` 一键环境脚本（2026-09-02）：依赖检查 → uv sync → npm install → ruff/pytest 验证；`download_models.py` 暂缓（拓展功能环境暂不配置）
+- [x] `scripts/setup.ps1` 一键环境脚本（2026-09-02 落位，**2026-09-07 已删除**）：该脚本在受限终端下定位 uv/node 频繁失败，维护成本高于收益；环境初始化回归本节 §3 的显式命令，脚本目录只保留 `build_release.ps1` 与 `smoke.py`
 - [x] 打包分发流水线（2026-09-07）：`packaging/app.py` + `packaging/app.spec`（PyInstaller onedir，前端 dist 外置于 exe 同级）+ `scripts/build_release.ps1` 一键脚本（前端构建 → PyInstaller → 组装 voice-system/ → zip → 清理中间产物）；`server/main.py` 新增冻结环境探测，打包态从 exe 同级挂载 web/dist；`pyinstaller` 入 dev 依赖组；已手动验证通过
 
 待完成：
@@ -331,3 +331,4 @@ uv run python scripts/smoke.py   # 端到端冒烟：采集→显示→处理→
 | 2026-09-06 | 1.4 开题报告重做：依模板重新生成 `prod/report_work/开题报告（第14组）.docx`，正文 1999 字（节1/2/3/4 = 309/366/664/660，满足下限），表头姓名三行（学号/专业留「（待补）」由作者手工补）、题目与指导教师已填、☑1 工程技术 / ☑3 软件、第 4 节嵌入架构框图（`arch_diagram.png`，1724×1180 @300dpi）与图注；6 篇参考文献；`fill_report.py` 复现脚本（lxml 树级操作）；ruff check . 通过 | zahiko |
 | 2026-09-07 | 打包分发：`packaging/app.py` + `app.spec`（PyInstaller onedir，uvicorn 动态加载模块显式声明，前端 dist 外置）+ `scripts/build_release.ps1` 一键脚本（前端构建→打包→组装 voice-system/ + start.bat + 使用说明→zip→清理中间产物）；`server/main.py` 冻结环境探测（exe 同级挂载 web/dist）；pyinstaller 入 dev 组；.gitignore 增 release/、build/；node 定位支持 NODE_EXE 覆盖与多布局回退，npm.cmd 失败自动降级 node+npm-cli.js。用户系统终端手动验证通过；新增交付物规则：报告与 PPT 未显式要求不列入待办 | zahiko |
 | 2026-09-07 | 阶段二功能开发（分四次提交）：① 采集——`/api/audio/devices` 设备枚举与选择、单/双声道、`/ws/record` 20Hz 电平推送、无麦 503 容错 ② 显示——`POST /api/analysis/spectrogram`（dB 量化 uint8 下发）、波形缩放/框选/平移/定位、trim 与 fade 效果器、AudioInfo 信息卡 ③ 处理——denoise 谱减法、`/api/effects/chain`、`/api/effects/undo`、`/api/effects/{id}/history`、血统字段 source_id/steps、EffectChainPanel 与 HistoryPanel ④ 播放——`/api/audio/{id}/stream` + PlayerBar（进度/暂停/倍速/A-B 对比，ADR 0007）+ `scripts/smoke.py` 冒烟脚本；测试 29 → 46 项 | zahiko |
+| 2026-09-07 | 删除 `scripts/setup.ps1`：受限终端下定位 uv/node 频繁失败，维护成本高于收益；环境初始化回归 AGENT.md §3 显式命令。同步清理 PLAN.md / AGENT.md / `docs/architecture.md` / `build_release.ps1` 注释中的引用（历史 session 日志与变更日志保持原样，不作改写） | zahiko |

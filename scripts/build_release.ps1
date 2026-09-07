@@ -19,7 +19,7 @@ function Use-NativeRedirect([scriptblock]$body) {
     try { & $body } finally { $ErrorActionPreference = $prev }
 }
 
-# 定位可执行文件：先查 PATH，再试常见安装位置（与 setup.ps1 同策略）
+# 定位可执行文件：先查 PATH，再试常见安装位置（受限终端常解析不到 PATH，故保留回退）
 function Resolve-Tool([string]$name, [string[]]$fallbacks) {
     $src = (Get-Command $name -ErrorAction SilentlyContinue).Source
     if ($src) { return $src }

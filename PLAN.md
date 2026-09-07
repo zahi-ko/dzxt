@@ -28,7 +28,8 @@
 - [x] 安装 uv，锁定 Python 3.11（`.python-version`）
 - [x] 主干依赖安装并生成 `uv.lock`
 - [x] 排查本机 GPU（RTX 4060 Laptop / 8GB，满足克隆需求）
-- [x] 编写 `scripts/setup.ps1` 一键环境脚本
+- [x] 编写 `scripts/setup.ps1` 一键环境脚本（2026-09-07 已删除：环境初始化改由 AGENT.md §3 的显式命令完成，避免脚本在受限终端下的定位问题）
+- [x] `scripts/smoke.py` 端到端冒烟脚本（2026-09-07，提交前必跑）
 - [ ] 编写 `scripts/download_models.py` 模型下载脚本骨架（暂缓：拓展功能环境暂不配置，需要时再补）
 
 ### 1.3 接口骨架
