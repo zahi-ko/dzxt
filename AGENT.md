@@ -296,6 +296,7 @@ uv run python scripts/smoke.py   # 端到端冒烟：采集→显示→处理→
 - [x] 1.4 可运行的系统原型（2026-09-07）：随打包分发流水线一并完成并验证
 - [ ] 1.4 其余交付物：架构设计说明书（报告与 PPT 类未显式要求不列入待办，见第 9 节规则）
 - [x] 阶段二功能开发（2026-09-07）：采集（设备/声道/WS 电平/定时停止）、显示（波形缩放选区/频谱/语谱图/信息卡）、处理（淡入淡出/谱减降噪/效果链/历史撤销/A-B 对比）、播放（流端点 + 播放器条），测试 46 项 + 冒烟脚本
+- [x] 运行期问题排查 5 项（2026-09-07，见变更日志最新行）：空 src 误报 / 流端点 Range 缺失导致 seek 失效 / 多次录音同名 / mp3 尾部解码失败 / vite 代理端口硬编码；测试 46 → 49 项，提交 `327d1f5`
 - [ ] 阶段三拓展功能（3.1 语音克隆 / 3.2 录音质量检测 / 3.3 语音加噪与降噪）
 
 ### 阶段二补充约定
@@ -331,4 +332,6 @@ uv run python scripts/smoke.py   # 端到端冒烟：采集→显示→处理→
 | 2026-09-06 | 1.4 开题报告重做：依模板重新生成 `prod/report_work/开题报告（第14组）.docx`，正文 1999 字（节1/2/3/4 = 309/366/664/660，满足下限），表头姓名三行（学号/专业留「（待补）」由作者手工补）、题目与指导教师已填、☑1 工程技术 / ☑3 软件、第 4 节嵌入架构框图（`arch_diagram.png`，1724×1180 @300dpi）与图注；6 篇参考文献；`fill_report.py` 复现脚本（lxml 树级操作）；ruff check . 通过 | zahiko |
 | 2026-09-07 | 打包分发：`packaging/app.py` + `app.spec`（PyInstaller onedir，uvicorn 动态加载模块显式声明，前端 dist 外置）+ `scripts/build_release.ps1` 一键脚本（前端构建→打包→组装 voice-system/ + start.bat + 使用说明→zip→清理中间产物）；`server/main.py` 冻结环境探测（exe 同级挂载 web/dist）；pyinstaller 入 dev 组；.gitignore 增 release/、build/；node 定位支持 NODE_EXE 覆盖与多布局回退，npm.cmd 失败自动降级 node+npm-cli.js。用户系统终端手动验证通过；新增交付物规则：报告与 PPT 未显式要求不列入待办 | zahiko |
 | 2026-09-07 | 阶段二功能开发（分四次提交）：① 采集——`/api/audio/devices` 设备枚举与选择、单/双声道、`/ws/record` 20Hz 电平推送、无麦 503 容错 ② 显示——`POST /api/analysis/spectrogram`（dB 量化 uint8 下发）、波形缩放/框选/平移/定位、trim 与 fade 效果器、AudioInfo 信息卡 ③ 处理——denoise 谱减法、`/api/effects/chain`、`/api/effects/undo`、`/api/effects/{id}/history`、血统字段 source_id/steps、EffectChainPanel 与 HistoryPanel ④ 播放——`/api/audio/{id}/stream` + PlayerBar（进度/暂停/倍速/A-B 对比，ADR 0007）+ `scripts/smoke.py` 冒烟脚本；测试 29 → 46 项 | zahiko |
+| 2026-09-07 | 阶段二功能开发（分四次提交）：① 采集——`/api/audio/devices` 设备枚举与选择、单/双声道、`/ws/record` 20Hz 电平推送、无麦 503 容错 ② 显示——`POST /api/analysis/spectrogram`（dB 量化 uint8 下发）、波形缩放/框选/平移/定位、trim 与 fade 效果器、AudioInfo 信息卡 ③ 处理——denoise 谱减法、`/api/effects/chain`、`/api/effects/undo`、`/api/effects/{id}/history`、血统字段 source_id/steps、EffectChainPanel 与 HistoryPanel ④ 播放——`/api/audio/{id}/stream` + PlayerBar（进度/暂停/倍速/A-B 对比，ADR 0007）+ `scripts/smoke.py` 冒烟脚本；测试 29 → 46 项 | zahiko |
 | 2026-09-07 | 删除 `scripts/setup.ps1`：受限终端下定位 uv/node 频繁失败，维护成本高于收益；环境初始化回归 AGENT.md §3 显式命令。同步清理 PLAN.md / AGENT.md / `docs/architecture.md` / `build_release.ps1` 注释中的引用（历史 session 日志与变更日志保持原样，不作改写） | zahiko |
+| 2026-09-07 | 运行期问题排查（用户 5 项 issue）：① 空 src 触发 `音频加载失败`——PlayerBar 改 `:src="streamUrl \|\| undefined"` + onError 加 audioId 兜底 ② 波形单击定位游标回跳 ③ 不支持拖动播放——`/api/audio/{id}/stream` 加 HTTP Range 解析（206 + Content-Range + Accept-Ranges，覆盖 a-b/a-/-N/多段/416） ④ 多次录音同名——`stop_record` 用「录音 HH:MM:SS」命名 ⑤ mp3 报 Unspecified internal error——`load_audio` 一次 read 失败时退回分块解码（VBR mp3 头部总帧数常大于实际可解码帧数）；`tests/test_short.mp3` 为 test.mp3 裁剪的 30s 短片；`vite.config.ts` 代理目标支持 `BACKEND_URL` 覆盖（默认 8000 不变）；pytest 46 → 49 项（mp3 上传/分块回退/Range 端点） | zahiko |
