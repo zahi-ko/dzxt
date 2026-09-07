@@ -13,6 +13,10 @@ node_modules/
 # 前端构建产物
 web/dist/
 
+# 打包分发产物（一律不入库，由 scripts/build_release.ps1 重建）
+release/
+build/
+
 # 音频与模型产物（大文件，禁止入库，统一走 scripts/download_models.py）
 data/
 models/

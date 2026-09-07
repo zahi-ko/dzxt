@@ -253,6 +253,8 @@ uv run pytest
 
 第 4 步最关键——它决定了下一个 session 是 5 分钟进入状态，还是半小时考古。
 
+> **规则（2026-09-07）**：报告与 PPT 类交付物，未显式要求时直接跳过，不列入待办。
+
 ---
 
 ## 10. 风险登记
@@ -283,12 +285,14 @@ uv run pytest
 - [x] 契约层 `server/schemas.py` 与 `session_store.py`（2026-09-02）
 - [x] 1.3 接口骨架全部条目（2026-09-02）：注册表与基础效果、音频 I/O、main.py 与三个路由、Vue 3 + TS 前端、前后端联调（真实麦克风录音 → 波形 → 播放 → 效果 → 下载全链路验证通过）
 - [x] `scripts/setup.ps1` 一键环境脚本（2026-09-02）：依赖检查 → uv sync → npm install → ruff/pytest 验证；`download_models.py` 暂缓（拓展功能环境暂不配置）
+- [x] 打包分发流水线（2026-09-07）：`packaging/app.py` + `packaging/app.spec`（PyInstaller onedir，前端 dist 外置于 exe 同级）+ `scripts/build_release.ps1` 一键脚本（前端构建 → PyInstaller → 组装 voice-system/ → zip → 清理中间产物）；`server/main.py` 新增冻结环境探测，打包态从 exe 同级挂载 web/dist；`pyinstaller` 入 dev 依赖组；已手动验证通过
 
 待完成：
 
 - [ ] `scripts/download_models.py` 模型下载脚本（暂缓，待拓展功能环境配置时再补）
 - [x] 1.4 开题交付物第一项（2026-09-06）：开题报告按模板重新生成并交付 `prod/report_work/开题报告（第14组）.docx`；正文 1999 字（节1/2/3/4 = 309/366/664/660），三项拓展功能在第 3 节研究内容中全部覆盖；架构框图嵌入第 4 节，6 篇参考文献；表头学号/专业位留「（待补）」待用户手工补填（已知限制）
-- [ ] 1.4 其余交付物：开题汇报 PPT、架构设计说明书、可运行系统原型
+- [x] 1.4 可运行的系统原型（2026-09-07）：随打包分发流水线一并完成并验证
+- [ ] 1.4 其余交付物：架构设计说明书（报告与 PPT 类未显式要求不列入待办，见第 9 节规则）
 - [ ] 阶段二功能开发（见 PLAN.md）
 
 **重建提醒**
@@ -314,3 +318,4 @@ uv run pytest
 | 2026-09-02 | 1.4 开题报告初稿：按模板生成 `prod/开题报告（第14组）.docx`（选题依据 346 / 研究现状 378 / 研究内容 577 / 技术路线 697 字，含架构框图与 6 篇参考文献）；`pyproject` 新增 `prod` 依赖组（python-docx / pymupdf，仅文档生成用）；进度文件同步 | zahiko |
 | 2026-09-06 | 拓展功能范围确定：在语音克隆基础上新增「录音质量检测」（音量过轻 / 疑似爆音 / 环境噪声嘈杂度评估与重录建议）与「语音加噪与降噪」（可调信噪比加噪 + 谱减法降噪闭环验证）两项，共三项必做；PLAN.md 阶段三同步拆分为 3.1–3.5 | zahiko |
 | 2026-09-06 | 1.4 开题报告重做：依模板重新生成 `prod/report_work/开题报告（第14组）.docx`，正文 1999 字（节1/2/3/4 = 309/366/664/660，满足下限），表头姓名三行（学号/专业留「（待补）」由作者手工补）、题目与指导教师已填、☑1 工程技术 / ☑3 软件、第 4 节嵌入架构框图（`arch_diagram.png`，1724×1180 @300dpi）与图注；6 篇参考文献；`fill_report.py` 复现脚本（lxml 树级操作）；ruff check . 通过 | zahiko |
+| 2026-09-07 | 打包分发：`packaging/app.py` + `app.spec`（PyInstaller onedir，uvicorn 动态加载模块显式声明，前端 dist 外置）+ `scripts/build_release.ps1` 一键脚本（前端构建→打包→组装 voice-system/ + start.bat + 使用说明→zip→清理中间产物）；`server/main.py` 冻结环境探测（exe 同级挂载 web/dist）；pyinstaller 入 dev 组；.gitignore 增 release/、build/；node 定位支持 NODE_EXE 覆盖与多布局回退，npm.cmd 失败自动降级 node+npm-cli.js。用户系统终端手动验证通过；新增交付物规则：报告与 PPT 未显式要求不列入待办 | zahiko |

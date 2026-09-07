@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -48,8 +49,22 @@ def health() -> dict:
     return {"status": "ok", "effects": len(list_effects())}
 
 
-WEB_DIST = Path(__file__).resolve().parent.parent / "web" / "dist"
-if WEB_DIST.is_dir():
+def _resolve_web_dist() -> Path | None:
+    """定位前端静态资源目录。
+
+    开发态：仓库内 web/dist。打包态（PyInstaller 冻结）：__file__ 位于
+    _internal 内部，不能用它反推，改以 exe 同级的 web/dist 为准（外置分发）。
+    """
+    if getattr(sys, "frozen", False):
+        base = Path(sys.executable).resolve().parent
+    else:
+        base = Path(__file__).resolve().parent.parent
+    dist = base / "web" / "dist"
+    return dist if dist.is_dir() else None
+
+
+WEB_DIST = _resolve_web_dist()
+if WEB_DIST is not None:
     app.mount("/", StaticFiles(directory=WEB_DIST, html=True), name="web")
 
 
