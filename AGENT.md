@@ -93,7 +93,7 @@ Vite 已配置代理：前端所有 `/api/*` 请求自动转发到 `127.0.0.1:80
 两个进程都要起，合成才可用；任一离线时克隆面板显示离线态，基础功能不受影响。
 
 ```powershell
-# 终端 1 · 引擎（GPT-SoVITS 官方整合包，CUDA + fp16）
+# 终端 1 · 引擎（GPT-SoVITS 官方整合包，CUDA + fp16，v2ProPlus 预训练模型）
 cd C:\Users\zahi\.venvs\GPT-SoVITS-v2pro-20250604
 .\runtime\python.exe api_v2.py -a 127.0.0.1 -p 9880
 
@@ -358,4 +358,5 @@ uv run python scripts/smoke.py   # 端到端冒烟：采集→显示→处理→
 | 2026-09-07 | 阶段二功能开发（分四次提交）：① 采集——`/api/audio/devices` 设备枚举与选择、单/双声道、`/ws/record` 20Hz 电平推送、无麦 503 容错 ② 显示——`POST /api/analysis/spectrogram`（dB 量化 uint8 下发）、波形缩放/框选/平移/定位、trim 与 fade 效果器、AudioInfo 信息卡 ③ 处理——denoise 谱减法、`/api/effects/chain`、`/api/effects/undo`、`/api/effects/{id}/history`、血统字段 source_id/steps、EffectChainPanel 与 HistoryPanel ④ 播放——`/api/audio/{id}/stream` + PlayerBar（进度/暂停/倍速/A-B 对比，ADR 0007）+ `scripts/smoke.py` 冒烟脚本；测试 29 → 46 项 | zahiko |
 | 2026-09-07 | 删除 `scripts/setup.ps1`：受限终端下定位 uv/node 频繁失败，维护成本高于收益；环境初始化回归 AGENT.md §3 显式命令。同步清理 PLAN.md / AGENT.md / `docs/architecture.md` / `build_release.ps1` 注释中的引用（历史 session 日志与变更日志保持原样，不作改写） | zahiko |
 | 2026-09-07 | 运行期问题排查（用户 5 项 issue）：① 空 src 触发 `音频加载失败`——PlayerBar 改 `:src="streamUrl \|\| undefined"` + onError 加 audioId 兜底 ② 波形单击定位游标回跳 ③ 不支持拖动播放——`/api/audio/{id}/stream` 加 HTTP Range 解析（206 + Content-Range + Accept-Ranges，覆盖 a-b/a-/-N/多段/416） ④ 多次录音同名——`stop_record` 按会话内序号命名「录音 N」（`_next_recording_label()`，删除不回收序号） ⑤ mp3 报 Unspecified internal error——`load_audio` 一次 read 失败时退回分块解码（VBR mp3 头部总帧数常大于实际可解码帧数）；`tests/test_short.mp3` 为 test.mp3 裁剪的 30s 短片；`vite.config.ts` 代理目标支持 `BACKEND_URL` 覆盖（默认 8000 不变）；pytest 46 → 50 项（mp3 上传/分块回退/Range 端点/录音序号） | zahiko |
+| 2026-09-08 | 引擎默认模型 v2 → **v2ProPlus**（改整合包 `GPT_SoVITS/configs/tts_infer.yaml` 的 custom 段：s1v3.ckpt + s2Gv2ProPlus.pth，CUDA + fp16 不变；原 v2 配置备份为同目录 `tts_infer.v2.bak.yaml`，回切即还原）。v2ProPlus 所需 sv 声纹预训练模型已在包内确认存在。同步更新 §3.4 与 services/clone/README | zahiko |
 | 2026-09-08 | 3.1 语音克隆环境与全链路：引擎采用官方整合包（`C:\Users\zahi\.venvs\GPT-SoVITS-v2pro-20250604`，v2+CUDA+fp16，api_v2 端口 9880，ADR 0004 补实施修订——适配层不含 torch）；新增 `services/clone` 适配层（FastAPI 9900，参考音频 2–15s 校验落盘 + JSON 索引持久化 + /tts 转发）；主干新增 `server/tts_provider.py`（TTSProvider ABC + LocalAdapterProvider + 云端插槽）与 `api/routers/clone.py`（/api/clone/status、refs CRUD 代理、synthesize 产物入库句柄制）；schemas.py 增 5 个克隆模型；httpx 升入主依赖；前端 ClonePanel（上传/参考文本/合成/删除，产物回流试听导出）；修复 httpx 默认信任系统代理导致回环调用被劫持的问题（trust_env=False）；pytest 50 → 59 项全过，ruff 通过，前端 build 通过 | zahiko |

@@ -18,7 +18,7 @@
 
 ## 启动（两个终端，合成前引擎必须先起）
 
-**1. 引擎**（GPT-SoVITS api_v2，CUDA + fp16，v2 预训练模型）：
+**1. 引擎**（GPT-SoVITS api_v2，CUDA + fp16，**v2ProPlus** 预训练模型）：
 
 ```powershell
 cd C:\Users\zahi\.venvs\GPT-SoVITS-v2pro-20250604
@@ -36,6 +36,9 @@ cd C:\Users\zahi\Desktop\dzxt\services\clone
 
 环境变量：`CLONE_ENGINE_URL`（默认 `http://127.0.0.1:9880`）、
 `CLONE_ADAPTER_PORT`（默认 9900）；主干侧 `CLONE_SERVICE_URL`（默认 9900）。
+
+引擎模型版本：`GPT_SoVITS/configs/tts_infer.yaml` 的 custom 段。当前 **v2ProPlus**
+（2026-09-08 切换，原份 v2 配置备份在同目录 `tts_infer.v2.bak.yaml`）；改完需重启引擎生效。
 
 ## 接口（主干 `/api/clone/*` 一一代理，前端只与主干通信）
 
