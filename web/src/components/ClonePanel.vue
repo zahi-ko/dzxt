@@ -156,9 +156,10 @@ onMounted(() => {
     </div>
 
     <div class="upload-row">
-      <input type="file" accept="audio/wav,audio/mpeg,audio/flac,.wav,.mp3,.flac" @change="uploadRef" />
+      <input type="file" accept="audio/*,.wav,.mp3,.flac,.ogg,.opus,.m4a,.aac,.wma,.webm,.aiff" @change="uploadRef" />
       <span v-if="uploading" class="hint">上传中…</span>
     </div>
+    <p class="hint">支持 wav / mp3 / flac / ogg / opus / m4a / aac / wma / webm / aiff，上传后自动转为 wav</p>
     <div class="field">
       <label>新参考音的文本（可选，上传时一并提交）</label>
       <input v-model="uploadPrompt" type="text" placeholder="这段参考音频说了什么" />

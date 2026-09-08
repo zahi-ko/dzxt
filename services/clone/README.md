@@ -45,7 +45,7 @@ cd C:\Users\zahi\Desktop\dzxt\services\clone
 | 适配层端点 | 方法 | 说明 |
 |---|---|---|
 | `/health` | GET | 自身 + 引擎探活 |
-| `/refs` | POST | 上传参考音频（multipart，WAV/mp3/flac，2–15s） |
+| `/refs` | POST | 上传参考音频（multipart，常见音频格式均收，2–15s） |
 | `/refs` | GET | 列出参考音频 |
 | `/refs/{id}` | PATCH | 修改参考文本 |
 | `/refs/{id}` | DELETE | 删除参考音频 |
@@ -55,7 +55,12 @@ cd C:\Users\zahi\Desktop\dzxt\services\clone
 
 ## 参考音频要求
 
-- **WAV 最佳**（也收 mp3/flac），5–10 秒清晰人声（受理 2–15s）
+- **格式**：wav / mp3 / flac / ogg / opus / m4a / aac / wma / webm / aiff 均可上传。
+  soundfile 主路径解码，解不动的（m4a/aac/wma/webm 等）走 ffmpeg 兜底
+  （管道直解优先，mp4 系 moov-at-end / 0 帧空输出等失败自动退临时文件重试）；
+  最终统一转写为 PCM_16 WAV 落盘，引擎侧只面对 wav。
+  ffmpeg 查找顺序：环境变量 `CLONE_FFMPEG` → 引擎整合包 → 系统 PATH。
+- **时长**：5–10 秒清晰人声（受理 2–15s）
 - **必须填写参考文本**（这段音频说了什么）——参与音色与韵律对齐，
   空文本会明显劣化克隆质量
 - 文件落盘 `wavs/`，索引 `wavs/refs.json`；均不入库（根 .gitignore）
