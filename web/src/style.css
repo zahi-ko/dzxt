@@ -69,7 +69,8 @@ button.danger {
 
 select,
 input[type='number'],
-input[type='text'] {
+input[type='text'],
+textarea {
   font: inherit;
   color: var(--text);
   background: var(--panel-2);
@@ -77,6 +78,11 @@ input[type='text'] {
   border-radius: var(--radius);
   padding: 6px 10px;
   width: 100%;
+}
+
+textarea {
+  resize: vertical;
+  min-height: 64px;
 }
 
 input[type='range'] {

@@ -5,6 +5,7 @@ import type {
   ApplyEffectResponse,
   AudioMeta,
   AudioStatsResponse,
+  CloneSynthesizeResponse,
   EffectInfo,
   EffectHistoryResponse,
   SpectrogramResponse,
@@ -13,6 +14,7 @@ import type {
 } from './api'
 import AudioInfo from './components/AudioInfo.vue'
 import AudioLibrary from './components/AudioLibrary.vue'
+import ClonePanel from './components/ClonePanel.vue'
 import EffectChainPanel from './components/EffectChainPanel.vue'
 import EffectPanel from './components/EffectPanel.vue'
 import HistoryPanel from './components/HistoryPanel.vue'
@@ -155,6 +157,11 @@ async function handleRecorded(meta: AudioMeta) {
   }
 }
 
+// 克隆产物与录音走同一刷新链路：入库句柄已由后端生成
+async function handleCloned(result: CloneSynthesizeResponse) {
+  await handleRecorded(result.meta)
+}
+
 async function handleApplied(result: ApplyEffectResponse) {
   try {
     await refreshAudios()
@@ -217,6 +224,7 @@ onMounted(async () => {
     <main class="layout">
       <aside class="col">
         <RecorderCard @recorded="handleRecorded" @error="showError" />
+        <ClonePanel @applied="handleCloned" @error="showError" />
         <AudioLibrary
           :items="audios"
           :selected-id="selectedId"

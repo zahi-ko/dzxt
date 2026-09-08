@@ -20,6 +20,7 @@ build/
 # 音频与模型产物（大文件，禁止入库，统一走 scripts/download_models.py）
 data/
 models/
+services/clone/wavs/
 *.wav
 *.mp3
 *.flac

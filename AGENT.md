@@ -59,7 +59,10 @@
 | 测试 | pytest | Core 层纯函数优先覆盖 |
 | 代码检查 | ruff | 提交前必跑 |
 
-**语音克隆子服务**（`services/clone/`）：Python 3.11 + PyTorch + GPT-SoVITS，**独立虚拟环境**，通过 HTTP 与主干通信。详见 `docs/adr/0004-voice-clone-local.md`。
+**语音克隆子服务**（`services/clone/`）：GPT-SoVITS **官方整合包**作引擎（独立进程，
+api_v2.py 端口 9880），适配层为轻量 FastAPI（端口 9900，独立 venv、**不含 torch**），
+主干经 `TTSProvider` 抽象层以 HTTP 对接。详见 `docs/adr/0004-voice-clone-local.md`
+（含 2026-09-08 实施修订）。
 
 ---
 
@@ -84,6 +87,25 @@ npm run build        # 产出 web/dist，由后端托管
 ```
 
 Vite 已配置代理：前端所有 `/api/*` 请求自动转发到 `127.0.0.1:8000`，因此前端代码里**一律写相对路径 `/api/...`**，不要硬编码端口。
+
+### 3.4 语音克隆子服务（3.1，拓展功能）
+
+两个进程都要起，合成才可用；任一离线时克隆面板显示离线态，基础功能不受影响。
+
+```powershell
+# 终端 1 · 引擎（GPT-SoVITS 官方整合包，CUDA + fp16）
+cd C:\Users\zahi\.venvs\GPT-SoVITS-v2pro-20250604
+.\runtime\python.exe api_v2.py -a 127.0.0.1 -p 9880
+
+# 终端 2 · 适配层（参考音频托管 + 合成转发，无 torch）
+cd C:\Users\zahi\Desktop\dzxt\services\clone
+.venv\Scripts\python.exe main.py
+```
+
+- 引擎地址/端口：`CLONE_ENGINE_URL`（默认 9880）；适配层：`CLONE_ADAPTER_PORT`（默认 9900）；主干指向：`CLONE_SERVICE_URL`（默认 9900）
+- 参考音频：WAV 5–10s 清晰人声，**必须填参考文本**（说了什么），否则克隆质量明显下降
+- 首次部署适配层：见 `services/clone/README.md`（venv 创建与依赖安装命令）
+- 克隆产物自动入库音频列表（句柄制），可直接施加效果、导出
 
 ### 3.3 硬件环境
 
@@ -297,6 +319,7 @@ uv run python scripts/smoke.py   # 端到端冒烟：采集→显示→处理→
 - [ ] 1.4 其余交付物：架构设计说明书（报告与 PPT 类未显式要求不列入待办，见第 9 节规则）
 - [x] 阶段二功能开发（2026-09-07）：采集（设备/声道/WS 电平/定时停止）、显示（波形缩放选区/频谱/语谱图/信息卡）、处理（淡入淡出/谱减降噪/效果链/历史撤销/A-B 对比）、播放（流端点 + 播放器条），测试 46 项 + 冒烟脚本
 - [x] 运行期问题排查 5 项（2026-09-07，见变更日志最新行）：空 src 误报 / 流端点 Range 缺失导致 seek 失效 / 多次录音同名 / mp3 尾部解码失败 / vite 代理端口硬编码；测试 46 → 49 项，提交 `327d1f5`
+- [x] 3.1 语音克隆环境与链路（2026-09-08）：GPT-SoVITS 整合包引擎就位（v2 + CUDA + fp16，api_v2 端口 9880）；`services/clone` 轻量适配层（独立 venv 无 torch，参考音频托管 + 合成转发，端口 9900）；主干 `TTSProvider` 抽象（含云端插槽）与 `/api/clone/*` 路由（合成产物直接入库句柄制）；前端 `ClonePanel`（参考音上传/管理、参考文本、合成、回流试听导出）；子服务离线 503 降级不拖垮基础功能；实测修复 httpx 系统代理劫持回环调用的坑（trust_env=False）；测试 50 → 59 项
 - [ ] 阶段三拓展功能（3.1 语音克隆 / 3.2 录音质量检测 / 3.3 语音加噪与降噪）
 
 ### 阶段二补充约定
@@ -335,3 +358,4 @@ uv run python scripts/smoke.py   # 端到端冒烟：采集→显示→处理→
 | 2026-09-07 | 阶段二功能开发（分四次提交）：① 采集——`/api/audio/devices` 设备枚举与选择、单/双声道、`/ws/record` 20Hz 电平推送、无麦 503 容错 ② 显示——`POST /api/analysis/spectrogram`（dB 量化 uint8 下发）、波形缩放/框选/平移/定位、trim 与 fade 效果器、AudioInfo 信息卡 ③ 处理——denoise 谱减法、`/api/effects/chain`、`/api/effects/undo`、`/api/effects/{id}/history`、血统字段 source_id/steps、EffectChainPanel 与 HistoryPanel ④ 播放——`/api/audio/{id}/stream` + PlayerBar（进度/暂停/倍速/A-B 对比，ADR 0007）+ `scripts/smoke.py` 冒烟脚本；测试 29 → 46 项 | zahiko |
 | 2026-09-07 | 删除 `scripts/setup.ps1`：受限终端下定位 uv/node 频繁失败，维护成本高于收益；环境初始化回归 AGENT.md §3 显式命令。同步清理 PLAN.md / AGENT.md / `docs/architecture.md` / `build_release.ps1` 注释中的引用（历史 session 日志与变更日志保持原样，不作改写） | zahiko |
 | 2026-09-07 | 运行期问题排查（用户 5 项 issue）：① 空 src 触发 `音频加载失败`——PlayerBar 改 `:src="streamUrl \|\| undefined"` + onError 加 audioId 兜底 ② 波形单击定位游标回跳 ③ 不支持拖动播放——`/api/audio/{id}/stream` 加 HTTP Range 解析（206 + Content-Range + Accept-Ranges，覆盖 a-b/a-/-N/多段/416） ④ 多次录音同名——`stop_record` 按会话内序号命名「录音 N」（`_next_recording_label()`，删除不回收序号） ⑤ mp3 报 Unspecified internal error——`load_audio` 一次 read 失败时退回分块解码（VBR mp3 头部总帧数常大于实际可解码帧数）；`tests/test_short.mp3` 为 test.mp3 裁剪的 30s 短片；`vite.config.ts` 代理目标支持 `BACKEND_URL` 覆盖（默认 8000 不变）；pytest 46 → 50 项（mp3 上传/分块回退/Range 端点/录音序号） | zahiko |
+| 2026-09-08 | 3.1 语音克隆环境与全链路：引擎采用官方整合包（`C:\Users\zahi\.venvs\GPT-SoVITS-v2pro-20250604`，v2+CUDA+fp16，api_v2 端口 9880，ADR 0004 补实施修订——适配层不含 torch）；新增 `services/clone` 适配层（FastAPI 9900，参考音频 2–15s 校验落盘 + JSON 索引持久化 + /tts 转发）；主干新增 `server/tts_provider.py`（TTSProvider ABC + LocalAdapterProvider + 云端插槽）与 `api/routers/clone.py`（/api/clone/status、refs CRUD 代理、synthesize 产物入库句柄制）；schemas.py 增 5 个克隆模型；httpx 升入主依赖；前端 ClonePanel（上传/参考文本/合成/删除，产物回流试听导出）；修复 httpx 默认信任系统代理导致回环调用被劫持的问题（trust_env=False）；pytest 50 → 59 项全过，ruff 通过，前端 build 通过 | zahiko |

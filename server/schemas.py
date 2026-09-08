@@ -206,3 +206,64 @@ class AudioStatsResponse(BaseModel):
 
 class ErrorResponse(BaseModel):
     detail: str
+
+
+# ---------------------------------------------------------------------------
+# 语音克隆（3.1）
+#
+# 克隆子服务为独立进程（services/clone 适配层 + GPT-SoVITS 引擎），
+# 主干通过 TTSProvider 抽象层对接。契约镜像 services/clone/app/schemas.py。
+# ---------------------------------------------------------------------------
+
+
+class CloneRefMeta(BaseModel):
+    """参考音频元数据。波形本体在适配层磁盘上，接口只传 ref_id。"""
+
+    ref_id: str
+    filename: str = Field(description="上传时的原始文件名，仅用于展示")
+    duration: float
+    sample_rate: int
+    prompt_text: str = Field(default="", description="参考音频对应的文字内容")
+    created_at: str
+
+
+class CloneRefListResponse(BaseModel):
+    items: list[CloneRefMeta]
+
+
+class CloneRefPromptUpdate(BaseModel):
+    prompt_text: str = Field(default="", max_length=200)
+
+
+class CloneSynthesizeRequest(BaseModel):
+    """克隆合成请求。
+
+    prompt_text 是参考音频「说了什么」，官方强烈建议填写——
+    它参与音色与韵律对齐，缺省时克隆质量明显下降。
+    """
+
+    ref_id: str
+    text: str = Field(min_length=1, max_length=500, description="要合成的目标文本")
+    prompt_text: str = Field(default="", max_length=200)
+    text_lang: str = Field(default="zh", description="目标文本语言：zh / en / ja / ko / yue")
+    prompt_lang: str = Field(default="zh", description="参考文本语言")
+    speed_factor: float = Field(default=1.0, ge=0.5, le=2.0)
+
+
+class CloneSynthesizeResponse(BaseModel):
+    """合成结果。音频已入库 SessionStore，按句柄制返回 audio_id。"""
+
+    audio_id: str
+    meta: AudioMeta
+    ref_id: str = Field(description="使用的参考音频")
+    text: str = Field(description="本次合成的文本，便于回显")
+
+
+class CloneStatusResponse(BaseModel):
+    """克隆链路状态。三级链路（主干 → 适配层 → 引擎）逐级探活。"""
+
+    adapter_online: bool
+    engine_online: bool = Field(default=False, description="适配层在线时才有效")
+    adapter_detail: str = ""
+    engine_detail: str = ""
+    refs: int = Field(default=0, description="适配层当前参考音频数量")

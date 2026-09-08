@@ -123,6 +123,34 @@ export interface HealthResponse {
   effects: number
 }
 
+export interface CloneRefMeta {
+  ref_id: string
+  filename: string
+  duration: number
+  sample_rate: number
+  prompt_text: string
+  created_at: string
+}
+
+export interface CloneRefListResponse {
+  items: CloneRefMeta[]
+}
+
+export interface CloneStatusResponse {
+  adapter_online: boolean
+  engine_online: boolean
+  adapter_detail: string
+  engine_detail: string
+  refs: number
+}
+
+export interface CloneSynthesizeResponse {
+  audio_id: string
+  meta: AudioMeta
+  ref_id: string
+  text: string
+}
+
 // ---------- 请求基础设施 ----------
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -235,6 +263,39 @@ export const api = {
       max_frames: maxFrames,
     }),
   stats: (audioId: string) => request<AudioStatsResponse>(`/analysis/${audioId}/stats`),
+
+  cloneStatus: () => request<CloneStatusResponse>('/clone/status'),
+  cloneRefs: () => request<CloneRefListResponse>('/clone/refs'),
+  cloneUploadRef: (file: File, promptText: string) => {
+    const form = new FormData()
+    form.append('file', file)
+    form.append('prompt_text', promptText)
+    return request<CloneRefMeta>('/clone/refs', { method: 'POST', body: form })
+  },
+  cloneUpdateRef: (refId: string, promptText: string) =>
+    request<CloneRefMeta>(`/clone/refs/${refId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt_text: promptText }),
+    }),
+  cloneDeleteRef: (refId: string) =>
+    request<null>(`/clone/refs/${refId}`, { method: 'DELETE' }),
+  cloneSynthesize: (options: {
+    refId: string
+    text: string
+    promptText: string
+    textLang?: string
+    promptLang?: string
+    speedFactor?: number
+  }) =>
+    post<CloneSynthesizeResponse>('/clone/synthesize', {
+      ref_id: options.refId,
+      text: options.text,
+      prompt_text: options.promptText,
+      text_lang: options.textLang ?? 'zh',
+      prompt_lang: options.promptLang ?? 'zh',
+      speed_factor: options.speedFactor ?? 1.0,
+    }),
 }
 
 // ---------- JSON Schema → 表单字段 ----------

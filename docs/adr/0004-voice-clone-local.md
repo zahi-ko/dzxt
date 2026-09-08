@@ -1,6 +1,6 @@
 # ADR 0004：语音克隆采用本地 GPT-SoVITS 并封装为独立进程
 
-- **状态**：已接受
+- **状态**：已接受（2026-09-08 补充实施修订）
 - **日期**：2026-09-02
 - **相关**：PLAN.md 阶段三 3.1、AGENT.md 第 10 节
 
@@ -50,3 +50,22 @@ GPT-SoVITS 依赖 PyTorch + CUDA 及数 GB 模型权重，是**唯一可能拖�
 
 - 需维护第二套 Python 环境与依赖清单（`services/clone/requirements.txt`）。
 - 需在 `AGENT.md` 注明子服务的独立启动方式。
+
+## 实施修订（2026-09-08）
+
+3.1 落地时对「独立 venv」的形态做两点修正，决策本身（本地部署 + 进程隔离 + HTTP 通信）不变：
+
+1. **引擎用官方整合包，不自建 torch 环境。** 手工装配 CUDA 版 PyTorch 是本项目
+   最大的单点风险，整合包已内置 runtime 与预训练权重。引擎目录
+   `C:\Users\zahi\.venvs\GPT-SoVITS-v2pro-20250604`，经 `api_v2.py`（端口 9880）对外服务。
+2. **`services/clone` 是轻量适配层，不含 torch。** 它只做参考音频托管
+   （落盘/校验/索引）与合成转发，原「独立 venv 装 PyTorch + GPT-SoVITS」的设想
+   由整合包承担。依赖清单以 `services/clone/pyproject.toml` 为准
+   （requirements.txt 的提法作废）。
+
+克隆深度：先做 zero-shot（5–10s 参考音直出，零训练）；few-shot 微调（8GB 显存
+需 LoRA，训练慢且易爆显存）列为可选增强，不进入 3.1 验收范围。
+
+代理陷阱（实测踩坑）：`httpx` 默认信任系统代理环境变量，本机代理会把
+127.0.0.1 的内部调用一并劫持（报 upstream connect failed）。所有指向
+适配层/引擎的 httpx 客户端必须显式 `trust_env=False`。
