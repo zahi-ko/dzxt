@@ -311,3 +311,32 @@ def test_adapter_prompt_free_forces_batch_size_one(
     assert response.status_code == 200
     assert captured["batch_size"] == 8
     assert captured["prompt_text"] == "参考"
+
+
+def test_adapter_synthesize_captures_prompt_text(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """合成成功后，非空参考文本自动回写到参考音记录（导出 .clone 才能带上）。"""
+    import main as adapter_main
+    from fastapi.testclient import TestClient
+
+    store = RefStore(directory=tmp_path)
+    record = store.add(_sine_wav(), "ref.wav", "")
+    monkeypatch.setattr(adapter_main, "store", store)
+    monkeypatch.setattr(adapter_main.engine, "synthesize", lambda payload: _sine_wav(0.3))
+
+    client = TestClient(adapter_main.app)
+    response = client.post(
+        "/synthesize",
+        json={"ref_id": record.ref_id, "text": "测试", "prompt_text": "这句是参考说的话"},
+    )
+    assert response.status_code == 200
+    assert store.get(record.ref_id).prompt_text == "这句是参考说的话"
+
+    # 与记录一致时不重复写（幂等）
+    response = client.post(
+        "/synthesize",
+        json={"ref_id": record.ref_id, "text": "测试2", "prompt_text": "这句是参考说的话"},
+    )
+    assert response.status_code == 200
+    assert store.get(record.ref_id).prompt_text == "这句是参考说的话"

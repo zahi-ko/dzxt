@@ -209,6 +209,21 @@ async function exportClone() {
   }
 }
 
+// 参考文本失焦自动保存：编辑改动直接持久到该参考音记录。
+// 此前编辑框只是临时覆盖不落盘，导出 .clone 会打包到空文本。
+async function savePromptOnBlur() {
+  const record = selectedRef.value
+  const text = promptText.value.trim()
+  if (!record || !text || text === record.prompt_text) return
+  try {
+    const updated = await api.cloneUpdateRef(record.ref_id, text)
+    const index = refs.value.findIndex((item) => item.ref_id === record.ref_id)
+    if (index >= 0) refs.value[index] = updated
+  } catch (error) {
+    emit('error', (error as Error).message)
+  }
+}
+
 async function removeRef() {
   if (!selectedRefId.value) return
   try {
@@ -283,8 +298,8 @@ onMounted(() => {
 
     <template v-if="selectedRef">
       <div class="field">
-        <label>参考文本（参与音色与韵律对齐，强烈建议填写）</label>
-        <textarea v-model="promptText" rows="2" placeholder="参考音频的文字内容"></textarea>
+        <label>参考文本（参与音色与韵律对齐，强烈建议填写；失焦自动保存到当前参考音）</label>
+        <textarea v-model="promptText" rows="2" placeholder="参考音频的文字内容" @blur="savePromptOnBlur"></textarea>
       </div>
       <div class="ref-actions">
         <button class="mini" @click="exportClone">导出音色 (.clone)</button>

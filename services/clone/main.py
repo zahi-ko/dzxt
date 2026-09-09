@@ -175,6 +175,15 @@ def synthesize(request: SynthesizeRequest) -> Response:
     except EngineError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
+    # 参考文本自动回写：合成成功即证明该文本有效，持久化到参考音记录。
+    # 此前参考文本只能在上传时填写，编辑框只是临时覆盖不落盘，
+    # 导致导出 .clone 时打包到空文本。
+    if request.prompt_text.strip() and request.prompt_text != record.prompt_text:
+        try:
+            store.update_prompt(request.ref_id, request.prompt_text)
+        except KeyError:
+            pass
+
     # 记录该音色最近一次合成的文本，导出 .clone 时作为预设合成文本打包
     try:
         store.update_sample_text(request.ref_id, request.text)
