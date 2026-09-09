@@ -69,8 +69,10 @@ cd C:\Users\zahi\Desktop\dzxt\services\clone
 | `repetition_penalty` | 1.35 | 重复惩罚（抑制复读卡顿） |
 | `seed` | -1 | 随机种子（-1 随机；固定后同文本同参数可复现） |
 
-前端 ClonePanel「高级参数」区已内置以上全部项并带效用说明；
-参数改动自动记忆（localStorage），下次打开沿用上一次的值，选中参考音同样记忆。
+前端 ClonePanel「高级参数」区已内置以上全部项并带效用说明。
+记忆策略分两级：**高级参数仅本次运行内记忆**（sessionStorage，重开程序恢复默认）；
+**参考音选择、合成文本持久记忆**（localStorage，重开沿用上一次）；
+参考文本由参考音记录（后端）承载，选中即恢复。
 
 ## 参考音频要求
 

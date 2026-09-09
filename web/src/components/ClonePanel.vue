@@ -15,13 +15,14 @@ const status = ref<CloneStatusResponse | null>(null)
 const refs = ref<CloneRefMeta[]>([])
 const selectedRefId = ref('')
 const promptText = ref('')
-const newText = ref('')
+// 合成文本持久记忆（localStorage）：重开程序沿用上一次输入
+const newText = ref(loadLastText())
 const uploadPrompt = ref('')
 const busy = ref(false)
 const uploading = ref(false)
 const importing = ref(false)
 
-// ---------- 合成参数（记忆式默认：改动即存 localStorage，下次沿用上一次的值） ----------
+// ---------- 高级参数（仅本次运行内记忆：sessionStorage，重开程序恢复默认） ----------
 
 interface CloneParams {
   textLang: string
@@ -39,6 +40,7 @@ interface CloneParams {
 
 const PARAMS_KEY = 'dzxt.clone-params.v1'
 const LAST_REF_KEY = 'dzxt.clone-last-ref.v1'
+const LAST_TEXT_KEY = 'dzxt.clone-last-text.v1'
 
 const DEFAULT_PARAMS: CloneParams = {
   textLang: 'zh',
@@ -56,7 +58,7 @@ const DEFAULT_PARAMS: CloneParams = {
 
 function loadParams(): CloneParams {
   try {
-    const raw = localStorage.getItem(PARAMS_KEY)
+    const raw = sessionStorage.getItem(PARAMS_KEY)
     if (!raw) return { ...DEFAULT_PARAMS }
     return { ...DEFAULT_PARAMS, ...(JSON.parse(raw) as Partial<CloneParams>) }
   } catch {
@@ -70,9 +72,9 @@ watch(
   params,
   (value) => {
     try {
-      localStorage.setItem(PARAMS_KEY, JSON.stringify(value))
+      sessionStorage.setItem(PARAMS_KEY, JSON.stringify(value))
     } catch {
-      /* 隐私模式等场景下不可写，静默降级为会话内记忆 */
+      /* 存储不可写时静默降级为纯内存记忆 */
     }
   },
   { deep: true },
@@ -80,6 +82,14 @@ watch(
 
 function resetParams() {
   params.value = { ...DEFAULT_PARAMS }
+}
+
+function loadLastText(): string {
+  try {
+    return localStorage.getItem(LAST_TEXT_KEY) ?? ''
+  } catch {
+    return ''
+  }
 }
 
 const selectedRef = computed(
@@ -130,6 +140,14 @@ async function refreshRefs(selectFirst = false) {
     emit('error', (error as Error).message)
   }
 }
+
+watch(newText, (value) => {
+  try {
+    localStorage.setItem(LAST_TEXT_KEY, value)
+  } catch {
+    /* 同上，静默降级 */
+  }
+})
 
 watch(selectedRefId, (value) => {
   if (value) {
@@ -280,7 +298,7 @@ onMounted(() => {
     </div>
 
     <details class="advanced">
-      <summary>高级参数（改动自动记忆，下次沿用上一次的值）</summary>
+      <summary>高级参数（本次运行内记忆；重开程序后恢复默认）</summary>
       <div class="field">
         <label>合成文本语言（决定发音分支；auto 自动检测但偶有误判，语言确定时选具体值更稳）</label>
         <select v-model="params.textLang">

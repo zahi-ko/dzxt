@@ -74,3 +74,17 @@
   本机适配层运行时被真服务穿透（200/404/400 而非 503）——`client` fixture 改为
   注入 `LocalAdapterProvider(base_url="http://127.0.0.1:1")`，离线路径确定可复现。
 - 测试：新增 prompt-free 归一用例；pytest 85 → 86 全过，ruff 过，前端 build 过。
+
+---
+
+## 追加 3：记忆策略分级（同日 21 点）
+
+- 用户需求：高级参数仅本次运行内记忆，重开程序恢复默认；其余参数全部持久记忆。
+- 实现（ClonePanel.vue）：
+  - 高级参数 11 项：localStorage → **sessionStorage**（同一标签页存活期间含刷新均保持，
+    关闭程序即清空，重开恢复默认）；折叠区标题同步注明；
+  - 合成文本：从「仅靠 sample_text 自动填充」改为显式持久（localStorage
+    `dzxt.clone-last-text.v1`，输入即存、重开沿用）；sample_text 自动填充仍作为
+    空文本时的兜底；
+  - 参考音选择保持 localStorage；参考文本由后端参考音记录承载（选中即恢复）。
+- 前端 build 过，ruff + pytest 86 全过（AGENT.md 预检约定）。
