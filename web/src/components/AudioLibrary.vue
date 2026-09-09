@@ -78,20 +78,34 @@ function play(audioId: string) {
 }
 
 li {
-  padding: 8px 10px;
+  padding: 8px 10px 8px 12px;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   background: var(--panel-2);
+  position: relative;
+  transition: border-color 0.15s, transform 0.1s;
 }
 
 li:hover {
-  border-color: #3a4252;
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
 }
 
 li.active {
-  border-color: var(--accent);
+  border-color: rgba(91, 140, 255, 0.55);
   background: var(--accent-soft);
+}
+
+li.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--accent);
 }
 
 .head {

@@ -222,10 +222,11 @@ defineExpose({ seek, play, pause, stop })
 
 <style scoped>
 .player {
-  padding: 10px 12px;
+  padding: 12px 16px;
   border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--panel);
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 40%), var(--panel);
+  box-shadow: var(--shadow-soft);
 }
 
 .row {
@@ -234,10 +235,19 @@ defineExpose({ seek, play, pause, stop })
   gap: 10px;
 }
 
+/* 播放键做主视觉：圆形渐变大按钮 */
+.row > button.primary,
+.row > button:nth-of-type(1) {
+  min-width: 64px;
+  text-align: center;
+  font-weight: 600;
+}
+
 .time {
   font-size: 12px;
   color: var(--text-dim);
   white-space: nowrap;
+  font-family: var(--font-mono);
 }
 
 .seek {
@@ -271,7 +281,8 @@ defineExpose({ seek, play, pause, stop })
 }
 
 .ab .on {
-  border-color: var(--accent);
+  border-color: rgba(91, 140, 255, 0.55);
   background: var(--accent-soft);
+  color: var(--accent);
 }
 </style>

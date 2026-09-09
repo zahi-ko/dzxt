@@ -239,8 +239,12 @@ onUnmounted(() => {
     </p>
 
     <div class="actions">
-      <button v-if="!recording" class="primary" @click="start">开始录音</button>
-      <button v-else class="danger" @click="finish">停止录音</button>
+      <button v-if="!recording" class="primary record" @click="start">
+        <span class="rec-icon" aria-hidden="true"></span>开始录音
+      </button>
+      <button v-else class="danger record recording" @click="finish">
+        <span class="rec-icon stop" aria-hidden="true"></span>停止录音
+      </button>
       <button :disabled="recording" @click="fileInput?.click()">上传文件</button>
       <input ref="fileInput" type="file" accept="audio/*" hidden @change="upload" />
     </div>
@@ -277,12 +281,13 @@ onUnmounted(() => {
 
 .meter {
   position: relative;
-  height: 8px;
-  background: #12151c;
+  height: 10px;
+  background: #0d1016;
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: 5px;
   overflow: hidden;
   margin-bottom: 6px;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
 }
 
 .meter-fill {
@@ -297,6 +302,7 @@ onUnmounted(() => {
   width: 2px;
   height: 100%;
   background: var(--danger);
+  box-shadow: 0 0 5px rgba(240, 112, 112, 0.8);
 }
 
 .meter-hint {
@@ -309,11 +315,58 @@ onUnmounted(() => {
 .actions {
   display: flex;
   gap: 8px;
+  align-items: center;
+}
+
+/* 录音主按钮：内嵌状态圆点，录音时红点脉冲 */
+.record {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rec-icon {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #fff;
+  flex: 0 0 auto;
+}
+
+.rec-icon.stop {
+  border-radius: 2px;
+  background: var(--danger);
+}
+
+.recording .rec-icon.stop {
+  animation: rec-pulse 1.1s ease-in-out infinite;
+}
+
+@keyframes rec-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
 }
 
 .rec-dot {
   font-size: 12px;
   color: var(--danger);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.rec-dot::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--danger);
+  animation: rec-pulse 1.1s ease-in-out infinite;
 }
 
 .dim {
