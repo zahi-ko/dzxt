@@ -318,6 +318,14 @@ export const api = {
     textLang?: string
     promptLang?: string
     speedFactor?: number
+    textSplitMethod?: string
+    batchSize?: number
+    fragmentInterval?: number
+    temperature?: number
+    topK?: number
+    topP?: number
+    repetitionPenalty?: number
+    seed?: number
   }) =>
     post<CloneSynthesizeResponse>('/clone/synthesize', {
       ref_id: options.refId,
@@ -326,6 +334,14 @@ export const api = {
       text_lang: options.textLang ?? 'zh',
       prompt_lang: options.promptLang ?? 'zh',
       speed_factor: options.speedFactor ?? 1.0,
+      text_split_method: options.textSplitMethod ?? 'cut5',
+      batch_size: options.batchSize ?? 1,
+      fragment_interval: options.fragmentInterval ?? 0.3,
+      temperature: options.temperature ?? 1.0,
+      top_k: options.topK ?? 15,
+      top_p: options.topP ?? 1.0,
+      repetition_penalty: options.repetitionPenalty ?? 1.35,
+      seed: options.seed ?? -1,
     }),
 }
 

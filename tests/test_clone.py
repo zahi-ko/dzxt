@@ -240,3 +240,59 @@ def test_import_ref_offline_returns_503(client: TestClient) -> None:
         files={"file": ("voice.clone", CLONE_BYTES, "application/octet-stream")},
     )
     assert response.status_code == 503
+
+
+# ---------- 合成参数透传（更多可调参数） ----------
+
+
+def test_synthesize_passes_all_engine_params(
+    fake_provider: FakeProvider, client: TestClient
+) -> None:
+    response = client.post(
+        "/api/clone/synthesize",
+        json={
+            "ref_id": "ref001",
+            "text": "你好",
+            "prompt_text": "参考",
+            "text_lang": "en",
+            "prompt_lang": "en",
+            "speed_factor": 1.2,
+            "text_split_method": "cut3",
+            "batch_size": 4,
+            "fragment_interval": 0.5,
+            "temperature": 0.8,
+            "top_k": 30,
+            "top_p": 0.9,
+            "repetition_penalty": 1.5,
+            "seed": 42,
+        },
+    )
+    assert response.status_code == 200
+    request = fake_provider.last_request
+    assert request is not None
+    assert request.text_lang == "en"
+    assert request.speed_factor == 1.2
+    assert request.text_split_method == "cut3"
+    assert request.batch_size == 4
+    assert request.fragment_interval == 0.5
+    assert request.temperature == 0.8
+    assert request.top_k == 30
+    assert request.top_p == 0.9
+    assert request.repetition_penalty == 1.5
+    assert request.seed == 42
+
+
+def test_synthesize_defaults_backward_compatible(
+    fake_provider: FakeProvider, client: TestClient
+) -> None:
+    response = client.post(
+        "/api/clone/synthesize", json={"ref_id": "ref001", "text": "你好"}
+    )
+    assert response.status_code == 200
+    request = fake_provider.last_request
+    assert request is not None
+    assert request.text_lang == "zh"
+    assert request.speed_factor == 1.0
+    assert request.text_split_method == "cut5"
+    assert request.batch_size == 1
+    assert request.seed == -1

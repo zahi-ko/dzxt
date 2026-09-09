@@ -41,3 +41,18 @@
 
 - 用户真机需重启适配层后回归「转换」体验（重点看之前失败的那个文件）。
 - PLAN 3.1 余项不变：参考音录制入口、相似度客观指标。
+
+---
+
+## 追加：合成参数扩展 + 记忆式默认参数（同日晚）
+
+- 需求：克隆可自定义配置偏少，要求提供更多设置并括号注明效用；默认参数记忆式（沿用上一次）。
+- 引擎侧调研：api_v2 `TTS_Request` 全字段核对（tts_infer.yaml languages = v2 列表）。
+- 新增透传参数（适配层 schema → 引擎 payload → 主干 schema/Provider → 前端 api.ts，四层镜像）：
+  text_split_method(cut0–cut5)、batch_size、fragment_interval、temperature、top_k、top_p、
+  repetition_penalty、seed；默认值与引擎一致，向后兼容。
+- 前端：ClonePanel「高级参数」折叠区（11 项，括号注明效用）+「恢复默认参数」；
+  localStorage 记忆参数与上次选中参考音（key: dzxt.clone-params.v1 / dzxt.clone-last-ref.v1），
+  参考音被删时自动回退到列表首项。
+- 测试：主干透传 + 默认兼容（FakeProvider.last_request）、适配层 payload 转发
+  （monkeypatch store/engine）。pytest 82 → 85 全过，ruff 过，前端 build 过。

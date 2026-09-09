@@ -55,6 +55,23 @@ cd C:\Users\zahi\Desktop\dzxt\services\clone
 
 引擎不可达时统一 503，主干翻译为「克隆子服务未就绪」提示。
 
+## 合成参数（/synthesize 请求体，默认值与引擎 api_v2 一致）
+
+| 参数 | 默认 | 效用 |
+|---|---|---|
+| `text_lang` / `prompt_lang` | `zh` | 合成文本 / 参考文本的语言（zh/en/ja/ko/yue/auto），决定发音分支 |
+| `speed_factor` | 1.0 | 语速倍率（0.5–2.0） |
+| `text_split_method` | `cut5` | 长文本切句策略 cut0–cut5（影响停顿节奏与长句稳定性） |
+| `batch_size` | 1 | 并行合成句数，越大越快、越吃显存 |
+| `fragment_interval` | 0.3 | 切句拼接处的静音秒数 |
+| `temperature` | 1.0 | 采样温度（越高越随机起伏，越低越平直） |
+| `top_k` / `top_p` | 15 / 1.0 | 采样范围截断（越小越保守） |
+| `repetition_penalty` | 1.35 | 重复惩罚（抑制复读卡顿） |
+| `seed` | -1 | 随机种子（-1 随机；固定后同文本同参数可复现） |
+
+前端 ClonePanel「高级参数」区已内置以上全部项并带效用说明；
+参数改动自动记忆（localStorage），下次打开沿用上一次的值，选中参考音同样记忆。
+
 ## 参考音频要求
 
 - **格式**：wav / mp3 / flac / ogg / opus / m4a / aac / wma / webm / aiff 均可上传。

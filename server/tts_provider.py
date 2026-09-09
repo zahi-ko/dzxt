@@ -149,6 +149,14 @@ class LocalAdapterProvider(TTSProvider):
             "text_lang": request.text_lang,
             "prompt_lang": request.prompt_lang,
             "speed_factor": request.speed_factor,
+            "text_split_method": request.text_split_method,
+            "batch_size": request.batch_size,
+            "fragment_interval": request.fragment_interval,
+            "temperature": request.temperature,
+            "top_k": request.top_k,
+            "top_p": request.top_p,
+            "repetition_penalty": request.repetition_penalty,
+            "seed": request.seed,
         }
         try:
             response = self._client.post(f"{self.base_url}/synthesize", json=payload)

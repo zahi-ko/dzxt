@@ -154,6 +154,14 @@ def synthesize(request: SynthesizeRequest) -> Response:
         "prompt_text": request.prompt_text or record.prompt_text,
         "prompt_lang": request.prompt_lang,
         "speed_factor": request.speed_factor,
+        "text_split_method": request.text_split_method,
+        "batch_size": request.batch_size,
+        "fragment_interval": request.fragment_interval,
+        "temperature": request.temperature,
+        "top_k": request.top_k,
+        "top_p": request.top_p,
+        "repetition_penalty": request.repetition_penalty,
+        "seed": request.seed,
     }
     try:
         wav = engine.synthesize(payload)

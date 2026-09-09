@@ -219,3 +219,52 @@ def test_clone_import_rejects_invalid(store: RefStore) -> None:
 def test_clone_export_missing_ref(store: RefStore) -> None:
     with pytest.raises(KeyError):
         store.export_clone("nonexistent")
+
+
+# ---------- 适配层合成参数透传 ----------
+
+
+def test_adapter_synthesize_forwards_engine_params(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import main as adapter_main
+    from fastapi.testclient import TestClient
+
+    store = RefStore(directory=tmp_path)
+    record = store.add(_sine_wav(), "ref.wav", "参考")
+    monkeypatch.setattr(adapter_main, "store", store)
+
+    captured: dict = {}
+
+    def fake_synth(payload: dict) -> bytes:
+        captured.update(payload)
+        return _sine_wav(0.3)
+
+    monkeypatch.setattr(adapter_main.engine, "synthesize", fake_synth)
+
+    client = TestClient(adapter_main.app)
+    response = client.post(
+        "/synthesize",
+        json={
+            "ref_id": record.ref_id,
+            "text": "测试",
+            "text_split_method": "cut3",
+            "batch_size": 4,
+            "fragment_interval": 0.6,
+            "temperature": 0.7,
+            "top_k": 40,
+            "top_p": 0.85,
+            "repetition_penalty": 1.6,
+            "seed": 42,
+        },
+    )
+    assert response.status_code == 200
+    assert captured["ref_audio_path"].endswith(f"{record.ref_id}.wav")
+    assert captured["text_split_method"] == "cut3"
+    assert captured["batch_size"] == 4
+    assert captured["fragment_interval"] == 0.6
+    assert captured["temperature"] == 0.7
+    assert captured["top_k"] == 40
+    assert captured["top_p"] == 0.85
+    assert captured["repetition_penalty"] == 1.6
+    assert captured["seed"] == 42

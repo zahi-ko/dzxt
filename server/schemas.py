@@ -246,9 +246,17 @@ class CloneSynthesizeRequest(BaseModel):
     ref_id: str
     text: str = Field(min_length=1, max_length=500, description="要合成的目标文本")
     prompt_text: str = Field(default="", max_length=200)
-    text_lang: str = Field(default="zh", description="目标文本语言：zh / en / ja / ko / yue")
+    text_lang: str = Field(default="zh", description="目标文本语言：zh / en / ja / ko / yue / auto")
     prompt_lang: str = Field(default="zh", description="参考文本语言")
     speed_factor: float = Field(default=1.0, ge=0.5, le=2.0)
+    text_split_method: str = Field(default="cut5", description="切分方式 cut0-cut5")
+    batch_size: int = Field(default=1, ge=1, le=64, description="并行合成批大小")
+    fragment_interval: float = Field(default=0.3, ge=0.0, le=2.0, description="句间停顿秒数")
+    temperature: float = Field(default=1.0, ge=0.01, le=2.0, description="采样温度")
+    top_k: int = Field(default=15, ge=1, le=200, description="top-k 采样")
+    top_p: float = Field(default=1.0, gt=0.0, le=1.0, description="top-p 采样")
+    repetition_penalty: float = Field(default=1.35, ge=1.0, le=10.0, description="重复惩罚")
+    seed: int = Field(default=-1, ge=-1, description="随机种子，-1 为随机")
 
 
 class CloneSynthesizeResponse(BaseModel):

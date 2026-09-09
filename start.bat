@@ -11,3 +11,6 @@ start "" ".venv\Scripts\python.exe" -m server.main
 
 cd web
 npm run dev
+
+timeout /t 10
+start "" "http://localhost:5173"
