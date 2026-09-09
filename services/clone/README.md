@@ -62,7 +62,7 @@ cd C:\Users\zahi\Desktop\dzxt\services\clone
 | `text_lang` / `prompt_lang` | `zh` | 合成文本 / 参考文本的语言（zh/en/ja/ko/yue/auto），决定发音分支 |
 | `speed_factor` | 1.0 | 语速倍率（0.5–2.0） |
 | `text_split_method` | `cut5` | 长文本切句策略 cut0–cut5（影响停顿节奏与长句稳定性） |
-| `batch_size` | 1 | 并行合成句数，越大越快、越吃显存 |
+| `batch_size` | 1 | 并行合成句数，越大越快、越吃显存（**仅填写参考文本时生效**；无参考文本的 prompt-free 模式引擎不支持批量，适配层自动归一为 1） |
 | `fragment_interval` | 0.3 | 切句拼接处的静音秒数 |
 | `temperature` | 1.0 | 采样温度（越高越随机起伏，越低越平直） |
 | `top_k` / `top_p` | 15 / 1.0 | 采样范围截断（越小越保守） |

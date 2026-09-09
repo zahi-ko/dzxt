@@ -20,13 +20,20 @@ from server.schemas import (
     CloneSynthesizeRequest,
 )
 from server.session_store import get_store
-from server.tts_provider import ProviderError, TTSProvider, set_provider
+from server.tts_provider import (
+    LocalAdapterProvider,
+    ProviderError,
+    TTSProvider,
+    set_provider,
+)
 
 
 @pytest.fixture()
 def client():
     get_store()._items.clear()
-    set_provider(None)  # 恢复真实单例（离线态测试用它）
+    # 离线降级测试不能依赖「9900 恰好没人监听」——本机适配层可能正在运行。
+    # 注入指向确定不可达地址的真 Provider，离线路径才可复现。
+    set_provider(LocalAdapterProvider(base_url="http://127.0.0.1:1"))
     with TestClient(app) as test_client:
         yield test_client
     set_provider(None)

@@ -268,3 +268,46 @@ def test_adapter_synthesize_forwards_engine_params(
     assert captured["top_p"] == 0.85
     assert captured["repetition_penalty"] == 1.6
     assert captured["seed"] == 42
+
+
+def test_adapter_prompt_free_forces_batch_size_one(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """引擎 prompt-free（无参考文本）不支持批量：batch_size 应被归一为 1。"""
+    import main as adapter_main
+    from fastapi.testclient import TestClient
+
+    store = RefStore(directory=tmp_path)
+    record = store.add(_sine_wav(), "ref.wav", "")  # 未填参考文本
+    monkeypatch.setattr(adapter_main, "store", store)
+
+    captured: dict = {}
+
+    def fake_synth(payload: dict) -> bytes:
+        captured.update(payload)
+        return _sine_wav(0.3)
+
+    monkeypatch.setattr(adapter_main.engine, "synthesize", fake_synth)
+
+    client = TestClient(adapter_main.app)
+    response = client.post(
+        "/synthesize",
+        json={"ref_id": record.ref_id, "text": "测试", "batch_size": 8},
+    )
+    assert response.status_code == 200
+    assert captured["batch_size"] == 1
+    assert captured["prompt_text"] == ""
+
+    # 填了参考文本后批量参数正常透传
+    response = client.post(
+        "/synthesize",
+        json={
+            "ref_id": record.ref_id,
+            "text": "测试",
+            "batch_size": 8,
+            "prompt_text": "参考",
+        },
+    )
+    assert response.status_code == 200
+    assert captured["batch_size"] == 8
+    assert captured["prompt_text"] == "参考"

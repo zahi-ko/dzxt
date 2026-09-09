@@ -56,3 +56,21 @@
   参考音被删时自动回退到列表首项。
 - 测试：主干透传 + 默认兼容（FakeProvider.last_request）、适配层 payload 转发
   （monkeypatch store/engine）。pytest 82 → 85 全过，ruff 过，前端 build 过。
+
+---
+
+## 追加 2：引擎警告「Prompt free is not supported batch_infer」处理（同日更晚）
+
+- 根因定位（读引擎源码）：
+  - `TTS.py:1113`：`prompt_text in [None, ""]` → `no_prompt_text=True`（prompt-free 模式）；
+  - `TTS.py:1252`：prompt-free 时 `prompt=None` 传入 t2s 模型；
+  - `t2s_model.py:596`：`infer_panel_batch_infer` 收到 `prompts=None` → 打印警告并
+    自动降级 `infer_panel_naive_batched`。
+  - 结论：**警告无害（合成照常成功）**，但 batch_size>1 在无参考文本时完全无效。
+- 修复：
+  - 适配层 `main.py`：有效参考文本为空 → 强制 `batch_size=1`（不发无效批量）；
+  - 前端批大小标签补「仅填写参考文本时生效」；README 参数表同步。
+- 顺带修复测试环境依赖：test_clone.py 的 5 个「离线降级」用例依赖 9900 无监听，
+  本机适配层运行时被真服务穿透（200/404/400 而非 503）——`client` fixture 改为
+  注入 `LocalAdapterProvider(base_url="http://127.0.0.1:1")`，离线路径确定可复现。
+- 测试：新增 prompt-free 归一用例；pytest 85 → 86 全过，ruff 过，前端 build 过。

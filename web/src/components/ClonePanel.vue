@@ -321,7 +321,7 @@ onMounted(() => {
         </select>
       </div>
       <div class="field">
-        <label>批大小（每次并行合成的句数，越大越快、越吃显存）</label>
+        <label>批大小（每次并行合成的句数，越大越快、越吃显存；仅填写参考文本时生效）</label>
         <input v-model.number="params.batchSize" type="number" step="1" min="1" max="64" />
       </div>
       <div class="field">

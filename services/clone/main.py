@@ -147,15 +147,22 @@ def synthesize(request: SynthesizeRequest) -> Response:
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
+    prompt_text = request.prompt_text or record.prompt_text
+    batch_size = request.batch_size
+    # 引擎 prompt-free（无参考文本）模式不支持 batch 并行：batch_size>1 会被
+    # 降级为逐句推理并打印警告——直接归一为 1，避免无效批量与告警噪音
+    if not prompt_text.strip():
+        batch_size = 1
+
     payload = {
         "text": request.text,
         "text_lang": request.text_lang,
         "ref_audio_path": store.path_of(request.ref_id),
-        "prompt_text": request.prompt_text or record.prompt_text,
+        "prompt_text": prompt_text,
         "prompt_lang": request.prompt_lang,
         "speed_factor": request.speed_factor,
         "text_split_method": request.text_split_method,
-        "batch_size": request.batch_size,
+        "batch_size": batch_size,
         "fragment_interval": request.fragment_interval,
         "temperature": request.temperature,
         "top_k": request.top_k,
