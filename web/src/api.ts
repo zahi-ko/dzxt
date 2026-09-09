@@ -129,6 +129,7 @@ export interface CloneRefMeta {
   duration: number
   sample_rate: number
   prompt_text: string
+  sample_text: string
   created_at: string
 }
 
@@ -280,6 +281,36 @@ export const api = {
     }),
   cloneDeleteRef: (refId: string) =>
     request<null>(`/clone/refs/${refId}`, { method: 'DELETE' }),
+  cloneExportRef: async (refId: string) => {
+    // 音色包下载：走 blob + a[download]，文件名取 Content-Disposition
+    const response = await fetch(`${BASE}/clone/refs/${refId}/export`)
+    if (!response.ok) {
+      let detail = `HTTP ${response.status}`
+      try {
+        detail = ((await response.json()) as { detail?: string }).detail ?? detail
+      } catch {
+        /* 非 JSON 错误体，保留状态码 */
+      }
+      throw new Error(detail)
+    }
+    const disposition = response.headers.get('Content-Disposition') ?? ''
+    const utf8Match = /filename\*=UTF-8''([^;]+)/.exec(disposition)
+    const asciiMatch = /filename="([^"]+)"/.exec(disposition)
+    const filename = utf8Match
+      ? decodeURIComponent(utf8Match[1])
+      : (asciiMatch?.[1] ?? 'voice.clone')
+    const url = URL.createObjectURL(await response.blob())
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = filename
+    anchor.click()
+    URL.revokeObjectURL(url)
+  },
+  cloneImportRef: (file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    return request<CloneRefMeta>('/clone/refs/import', { method: 'POST', body: form })
+  },
   cloneSynthesize: (options: {
     refId: string
     text: string

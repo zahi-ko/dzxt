@@ -59,6 +59,14 @@ class TTSProvider(ABC):
     def delete_ref(self, ref_id: str) -> None: ...
 
     @abstractmethod
+    def export_ref(self, ref_id: str) -> bytes:
+        """导出音色包（.clone 字节）。失败抛 ProviderError。"""
+
+    @abstractmethod
+    def import_ref(self, data: bytes, filename: str) -> CloneRefMeta:
+        """导入音色包（.clone 字节）。失败抛 ProviderError。"""
+
+    @abstractmethod
     def synthesize(self, request: CloneSynthesizeRequest) -> bytes:
         """合成并返回 WAV 字节。失败抛 ProviderError。"""
 
@@ -113,6 +121,25 @@ class LocalAdapterProvider(TTSProvider):
 
     def delete_ref(self, ref_id: str) -> None:
         self._request("DELETE", f"/refs/{ref_id}")
+
+    def export_ref(self, ref_id: str) -> bytes:
+        try:
+            response = self._client.get(f"{self.base_url}/refs/{ref_id}/export")
+        except httpx.HTTPError as exc:
+            raise ProviderError(f"适配层连接失败：{exc.__class__.__name__}") from exc
+        if response.status_code >= 400:
+            raise ProviderError(_detail_of(response), status_code=response.status_code)
+        if len(response.content) < 22:  # 空 ZIP 也有 22 字节 EOCD
+            raise ProviderError("适配层返回了空音色包", status_code=502)
+        return response.content
+
+    def import_ref(self, data: bytes, filename: str) -> CloneRefMeta:
+        response = self._request(
+            "POST",
+            "/refs/import",
+            files={"file": (filename or "voice.clone", data, "application/octet-stream")},
+        )
+        return CloneRefMeta(**response)
 
     def synthesize(self, request: CloneSynthesizeRequest) -> bytes:
         payload = {

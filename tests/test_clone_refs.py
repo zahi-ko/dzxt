@@ -22,8 +22,10 @@ import pytest
 CLONE_DIR = Path(__file__).resolve().parents[1] / "services" / "clone"
 sys.path.insert(0, str(CLONE_DIR))
 
-from app.config import REF_MAX_SEC, REF_MIN_SEC, SUPPORTED_EXTENSIONS  # noqa: E402
+from app.config import REF_MAX_SEC, REF_MIN_SEC  # noqa: E402
 from app.refs import RefError, RefStore  # noqa: E402
+
+from common.audio_codec import SUPPORTED_EXTENSIONS  # noqa: E402
 
 HAS_FFMPEG = shutil.which("ffmpeg") is not None
 SR = 32000
@@ -116,8 +118,8 @@ def test_aac_upload_via_ffmpeg(store: RefStore) -> None:
     aac = _transcode(_sine_wav(), ["-c:a", "aac", "-b:a", "128k"], "adts")
     record = store.add(aac, "ref.aac", "参考")
     assert record.duration == pytest.approx(6.0, rel=0.1)
-    with_ref = store.get(record.ref_id)
-    assert with_ref.filename == "ref.aac"
+    # 展示名归一为 .wav（已自动转换）
+    assert store.get(record.ref_id).filename == "ref.wav"
 
 
 @pytest.mark.skipif(not HAS_FFMPEG, reason="需要 ffmpeg")
@@ -159,3 +161,61 @@ def test_corrupt_wav_reports_ffmpeg_detail(store: RefStore) -> None:
     """soundfile 解不动的损坏文件，错误信息应来自 ffmpeg 且可读。"""
     with pytest.raises(RefError, match="解码失败"):
         store.add(b"RIFFxxxxWAVEjunk", "corrupt.wav", "")
+
+
+# ---------- 统一转码模块（common/audio_codec） ----------
+
+
+def test_normalize_extension() -> None:
+    from common.audio_codec import normalize_extension
+
+    assert normalize_extension("song.mp3") == "song.wav"
+    assert normalize_extension("rec") == "rec.wav"
+    assert normalize_extension("keep.wav") == "keep.wav"
+    assert normalize_extension("keep.WAV") == "keep.WAV"
+    assert normalize_extension("") == ""
+
+
+def test_decode_rejects_unsupported_extension() -> None:
+    from common.audio_codec import CodecError, decode_audio
+
+    with pytest.raises(CodecError, match="不支持的音频格式"):
+        decode_audio(b"data", filename="notes.txt")
+
+
+def test_decode_wav_returns_2d() -> None:
+    from common.audio_codec import decode_audio
+
+    data, sr = decode_audio(_sine_wav(3.0), filename="a.wav")
+    assert data.ndim == 2
+    assert sr == SR
+
+
+# ---------- 音色 .clone 打包与还原 ----------
+
+
+def test_clone_export_import_roundtrip(tmp_path: Path) -> None:
+    source = RefStore(directory=tmp_path / "src")
+    record = source.add(_sine_wav(), "我的声音.mp3", "参考文本内容")
+    source.update_sample_text(record.ref_id, "预设合成文本")
+
+    payload, suggested = source.export_clone(record.ref_id)
+    assert suggested == "我的声音.clone"
+
+    target = RefStore(directory=tmp_path / "dst")
+    restored = target.import_clone(payload, suggested)
+    assert restored.prompt_text == "参考文本内容"
+    assert restored.sample_text == "预设合成文本"
+    assert restored.duration == pytest.approx(record.duration, rel=0.01)
+    assert (target.directory / f"{restored.ref_id}.wav").exists()
+    assert target.get(restored.ref_id).ref_id == restored.ref_id
+
+
+def test_clone_import_rejects_invalid(store: RefStore) -> None:
+    with pytest.raises(RefError, match="无效的音色文件"):
+        store.import_clone(b"not a zip", "fake.clone")
+
+
+def test_clone_export_missing_ref(store: RefStore) -> None:
+    with pytest.raises(KeyError):
+        store.export_clone("nonexistent")

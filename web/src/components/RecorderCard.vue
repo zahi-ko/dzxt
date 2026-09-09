@@ -107,7 +107,10 @@ async function loadDevices() {
   try {
     const result = await api.devices()
     devices.value = result.items
-    if (deviceIndex.value === null) deviceIndex.value = result.default_index
+    // 默认保持 null = 「系统默认」选项；仅当用户上次明确选过设备时才恢复
+    if (deviceIndex.value !== null && !devices.value.some((d) => d.index === deviceIndex.value)) {
+      deviceIndex.value = null
+    }
   } catch (error) {
     emit('error', (error as Error).message)
   }

@@ -53,8 +53,11 @@ REF = CloneRefMeta(
     duration=6.0,
     sample_rate=32000,
     prompt_text="参考文本",
+    sample_text="预设合成文本",
     created_at="2026-09-08T12:00:00",
 )
+
+CLONE_BYTES = b"PK\x03\x04 fake clone package bytes"
 
 
 class FakeProvider(TTSProvider):
@@ -63,6 +66,8 @@ class FakeProvider(TTSProvider):
     def __init__(self, fail: bool = False) -> None:
         self.fail = fail
         self.deleted: list[str] = []
+        self.exported: list[str] = []
+        self.imported: tuple[bytes, str] | None = None
         self.last_request: CloneSynthesizeRequest | None = None
 
     def name(self) -> str:
@@ -90,6 +95,18 @@ class FakeProvider(TTSProvider):
 
     def delete_ref(self, ref_id: str) -> None:
         self.deleted.append(ref_id)
+
+    def export_ref(self, ref_id: str) -> bytes:
+        if self.fail:
+            raise ProviderError("down")
+        self.exported.append(ref_id)
+        return CLONE_BYTES
+
+    def import_ref(self, data: bytes, filename: str) -> CloneRefMeta:
+        if self.fail:
+            raise ProviderError("down")
+        self.imported = (data, filename)
+        return REF.model_copy(update={"filename": "导入音色.wav"})
 
     def synthesize(self, request: CloneSynthesizeRequest) -> bytes:
         if self.fail:
@@ -190,4 +207,36 @@ def test_synthesize_engine_failure_maps_to_503(
 ) -> None:
     fake_provider.fail = True
     response = client.post("/api/clone/synthesize", json={"ref_id": "ref001", "text": "你好"})
+    assert response.status_code == 503
+
+
+def test_export_ref_proxies(fake_provider: FakeProvider, client: TestClient) -> None:
+    response = client.get("/api/clone/refs/ref001/export")
+    assert response.status_code == 200
+    assert response.content == CLONE_BYTES
+    assert "attachment" in response.headers["content-disposition"]
+    assert ".clone" in response.headers["content-disposition"]
+    assert fake_provider.exported == ["ref001"]
+
+
+def test_export_ref_offline_returns_503(client: TestClient) -> None:
+    response = client.get("/api/clone/refs/ref001/export")
+    assert response.status_code == 503
+
+
+def test_import_ref_proxies(fake_provider: FakeProvider, client: TestClient) -> None:
+    response = client.post(
+        "/api/clone/refs/import",
+        files={"file": ("voice.clone", CLONE_BYTES, "application/octet-stream")},
+    )
+    assert response.status_code == 200
+    assert response.json()["filename"] == "导入音色.wav"
+    assert fake_provider.imported == (CLONE_BYTES, "voice.clone")
+
+
+def test_import_ref_offline_returns_503(client: TestClient) -> None:
+    response = client.post(
+        "/api/clone/refs/import",
+        files={"file": ("voice.clone", CLONE_BYTES, "application/octet-stream")},
+    )
     assert response.status_code == 503

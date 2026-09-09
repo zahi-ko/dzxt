@@ -10,6 +10,8 @@
 
 from __future__ import annotations
 
+from urllib.parse import quote
+
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
@@ -54,6 +56,7 @@ def _meta(record) -> RefMeta:
         duration=record.duration,
         sample_rate=record.sample_rate,
         prompt_text=record.prompt_text,
+        sample_text=record.sample_text,
         created_at=record.created_at,
     )
 
@@ -104,6 +107,34 @@ def delete_ref(ref_id: str) -> Response:
     return Response(status_code=204)
 
 
+@app.get("/refs/{ref_id}/export", summary="导出音色为 .clone 文件")
+def export_ref(ref_id: str) -> Response:
+    """ZIP 容器（voice.json + ref.wav），只含文本与参考音频，不含模型权重。"""
+    try:
+        payload, suggested = store.export_clone(ref_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    ascii_fallback = suggested.encode("ascii", "ignore").decode() or "voice.clone"
+    disposition = (
+        f'attachment; filename="{ascii_fallback}"; '
+        f"filename*=UTF-8''{quote(suggested)}"
+    )
+    return Response(
+        content=payload,
+        media_type="application/octet-stream",
+        headers={"Content-Disposition": disposition},
+    )
+
+
+@app.post("/refs/import", response_model=RefMeta, summary="导入 .clone 音色文件")
+def import_ref(file: UploadFile = File(...)) -> RefMeta:
+    try:
+        record = store.import_clone(file.file.read(), file.filename or "")
+    except RefError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return _meta(record)
+
+
 @app.post("/synthesize", summary="合成克隆语音，返回 WAV 字节")
 def synthesize(request: SynthesizeRequest) -> Response:
     if len(request.text) > TEXT_MAX_CHARS:
@@ -128,6 +159,12 @@ def synthesize(request: SynthesizeRequest) -> Response:
         wav = engine.synthesize(payload)
     except EngineError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    # 记录该音色最近一次合成的文本，导出 .clone 时作为预设合成文本打包
+    try:
+        store.update_sample_text(request.ref_id, request.text)
+    except KeyError:
+        pass
 
     return Response(content=wav, media_type="audio/wav")
 

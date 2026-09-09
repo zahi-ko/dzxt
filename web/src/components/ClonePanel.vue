@@ -19,7 +19,7 @@ const newText = ref('')
 const uploadPrompt = ref('')
 const busy = ref(false)
 const uploading = ref(false)
-const savingPrompt = ref(false)
+const importing = ref(false)
 
 const selectedRef = computed(
   () => refs.value.find((item) => item.ref_id === selectedRefId.value) ?? null
@@ -67,7 +67,12 @@ async function refreshRefs(selectFirst = false) {
 }
 
 watch(selectedRefId, () => {
-  promptText.value = selectedRef.value?.prompt_text ?? ''
+  const record = selectedRef.value
+  promptText.value = record?.prompt_text ?? ''
+  // 导入的音色带预设合成文本：为空时自动填入，选完即可试听
+  if (record?.sample_text && !newText.value.trim()) {
+    newText.value = record.sample_text
+  }
 })
 
 async function uploadRef(event: Event) {
@@ -88,16 +93,29 @@ async function uploadRef(event: Event) {
   }
 }
 
-async function savePrompt() {
-  if (!selectedRefId.value) return
-  savingPrompt.value = true
+async function importClone(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+  importing.value = true
   try {
-    await api.cloneUpdateRef(selectedRefId.value, promptText.value)
+    const meta = await api.cloneImportRef(file)
     await refreshRefs()
+    selectedRefId.value = meta.ref_id
   } catch (error) {
     emit('error', (error as Error).message)
   } finally {
-    savingPrompt.value = false
+    importing.value = false
+  }
+}
+
+async function exportClone() {
+  if (!selectedRefId.value) return
+  try {
+    await api.cloneExportRef(selectedRefId.value)
+  } catch (error) {
+    emit('error', (error as Error).message)
   }
 }
 
@@ -165,13 +183,23 @@ onMounted(() => {
       <input v-model="uploadPrompt" type="text" placeholder="这段参考音频说了什么" />
     </div>
 
+    <div class="field">
+      <label>导入音色（.clone 文件，含参考音频与文本）</label>
+      <div class="upload-row">
+        <input type="file" accept=".clone" @change="importClone" />
+        <span v-if="importing" class="hint">导入中…</span>
+      </div>
+    </div>
+
     <template v-if="selectedRef">
       <div class="field">
         <label>参考文本（参与音色与韵律对齐，强烈建议填写）</label>
         <textarea v-model="promptText" rows="2" placeholder="参考音频的文字内容"></textarea>
-        <button class="mini" :disabled="savingPrompt" @click="savePrompt">保存参考文本</button>
       </div>
-      <button class="danger-text" @click="removeRef">删除此参考音频</button>
+      <div class="ref-actions">
+        <button class="mini" @click="exportClone">导出音色 (.clone)</button>
+        <button class="danger-text" @click="removeRef">删除此参考音频</button>
+      </div>
     </template>
 
     <div class="field">
@@ -226,10 +254,16 @@ onMounted(() => {
   width: 100%;
 }
 
+.ref-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+
 .mini {
   font-size: 12px;
   padding: 3px 10px;
-  margin-top: 6px;
 }
 
 .danger-text {
@@ -239,7 +273,6 @@ onMounted(() => {
   color: var(--danger);
   font-size: 12px;
   cursor: pointer;
-  margin-bottom: 12px;
 }
 
 .danger-text:hover {

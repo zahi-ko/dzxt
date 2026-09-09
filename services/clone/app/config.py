@@ -7,8 +7,14 @@
 from __future__ import annotations
 
 import os
-import shutil
+import sys
 from pathlib import Path
+
+# 引入仓库根的 common/ 共享模块（audio_codec 与主干共用同一份实现）。
+# services/clone/app/config.py → parents[3] = 仓库根
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
 # GPT-SoVITS 引擎（api_v2.py）地址
 ENGINE_BASE_URL = os.environ.get("CLONE_ENGINE_URL", "http://127.0.0.1:9880")
@@ -31,22 +37,3 @@ TEXT_MAX_CHARS = 500
 # 引擎探活与合成的超时（秒）。合成走冷启动时首次可能偏慢，放宽读超时。
 HEALTH_TIMEOUT = 3.0
 SYNTH_TIMEOUT = (30.0, 300.0)
-
-# 上传受理的音频格式。soundfile(libsndfile) 原生可解的放 SOUNDFILE 格式组；
-# 其余（m4a/aac/wma/webm 等）依赖 ffmpeg 兜底解码，最终统一转写为 WAV 落盘。
-SUPPORTED_EXTENSIONS: frozenset[str] = frozenset(
-    {".wav", ".mp3", ".flac", ".ogg", ".oga", ".opus", ".aif", ".aiff",
-     ".m4a", ".m4b", ".aac", ".wma", ".webm"}
-)
-
-# ffmpeg 查找顺序：环境变量 → 引擎整合包内置 → 系统 PATH。
-_FFMPEG_ENV = os.environ.get("CLONE_FFMPEG", "")
-_FFMPEG_CANDIDATES = [
-    Path(_FFMPEG_ENV) if _FFMPEG_ENV else None,
-    Path(os.environ.get("CLONE_ENGINE_DIR", r"C:\Users\zahi\.venvs\GPT-SoVITS-v2pro-20250604"))
-    / "runtime" / "bin" / "ffmpeg.exe",
-    Path(r"C:\Users\zahi\.venvs\GPT-SoVITS-v2pro-20250604") / "ffmpeg.exe",
-]
-FFMPEG_PATH: str | None = next(
-    (str(p) for p in _FFMPEG_CANDIDATES if p and p.is_file()), None
-) or shutil.which("ffmpeg")

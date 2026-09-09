@@ -1,0 +1,43 @@
+# 2026-09-09 · 克隆链路四项优化（默认设备 / 删按钮 / 统一转码 / .clone 打包）
+
+## 需求与落点
+
+1. **采集设备默认「系统默认」**：RecorderCard 不再用后端 default_index 自动选中，
+   保持 null = 系统默认；仅在记忆的设备不存在时重置为 null。
+2. **删除「保存参考文本」按钮**：参考文本在「上传时填写 + 合成时临时覆盖」
+   两个场景已覆盖，持久化按钮无实际价值。PATCH 端点保留（API 契约不动）。
+3. **转换无效修复 + 上传预操作统一**：
+   - 根因排查：当前适配层代码实测 mp3/m4a/wma/flac 转换全部成功 → 用户侧
+     「无效」最可能是适配层进程仍是旧代码（改码后未重启），加上主干上传
+     m4a 等格式直接 415、且转换后列表仍显示 .mp3 让人以为没转。
+   - 新增 `common/audio_codec.py`：主干与适配层共用同一份解码/编码实现
+     （soundfile 主路径 + ffmpeg 兜底 + encode_wav），消灭两处重复实现。
+   - 主干 `/api/audio/upload` 覆盖面扩到全部常见格式；两侧上传后展示名
+     统一归一为 .wav（转换在 UI 上可见）。
+   - 解码策略修正：直接读失败 → **先 ffmpeg**（干净处理 VBR mp3 尾帧、
+     坏头 flac、m4a moov-at-end）→ 再分块截断（无 ffmpeg 的历史兜底）。
+     实测修复：管道输出的 FLAC 头部声明帧数是垃圾巨值，旧策略走分块
+     截断只剩 4.096s（2^17 帧），ffmpeg 路径可干净解出完整 6s。
+   - **适配层改码后必须重启**（start.bat 重新双击即可）。
+4. **音色 .clone 保存/导入**：
+   - 格式：ZIP 容器，`voice.json`（format 标识/version/音色名/参考文本/
+     预设合成文本/时长/采样率）+ `ref.wav`。不含 pth——zero-shot 无需权重。
+   - 预设合成文本 = 该音色最近一次成功合成的文本（适配层 /synthesize 成功
+     后自动记录到 RefRecord.sample_text）。
+   - 链路：适配层 GET /refs/{id}/export、POST /refs/import → 主干 Provider
+     抽象扩 2 个方法 + 路由代理（UTF-8 Content-Disposition）→ 前端
+     「导出音色 (.clone)」blob 下载 + .clone 导入入口 + 选中音色自动预填
+     合成文本。
+   - 坑：导入时 `.clone` 扩展名会被转码预检拒绝 → 内部落名统一
+     `_safe_voice_name(name) + ".wav"`。
+
+## 验证
+
+- pytest 72 → 82 项全过（新增 roundtrip/非法包/导出导入代理与 503/归一化等 10 项）
+- ruff 通过；前端 vue-tsc + build 通过
+- 适配层端到端复测（TestClient）：mp3/m4a/wma/flac 上传全部 201 + 时长正确
+
+## 遗留
+
+- 用户真机需重启适配层后回归「转换」体验（重点看之前失败的那个文件）。
+- PLAN 3.1 余项不变：参考音录制入口、相似度客观指标。

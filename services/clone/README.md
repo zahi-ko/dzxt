@@ -49,6 +49,8 @@ cd C:\Users\zahi\Desktop\dzxt\services\clone
 | `/refs` | GET | 列出参考音频 |
 | `/refs/{id}` | PATCH | 修改参考文本 |
 | `/refs/{id}` | DELETE | 删除参考音频 |
+| `/refs/{id}/export` | GET | 导出音色 .clone（voice.json + ref.wav） |
+| `/refs/import` | POST | 导入 .clone 音色文件 |
 | `/synthesize` | POST | 合成，返回 WAV 字节（同步，单句秒级） |
 
 引擎不可达时统一 503，主干翻译为「克隆子服务未就绪」提示。
@@ -56,14 +58,28 @@ cd C:\Users\zahi\Desktop\dzxt\services\clone
 ## 参考音频要求
 
 - **格式**：wav / mp3 / flac / ogg / opus / m4a / aac / wma / webm / aiff 均可上传。
-  soundfile 主路径解码，解不动的（m4a/aac/wma/webm 等）走 ffmpeg 兜底
-  （管道直解优先，mp4 系 moov-at-end / 0 帧空输出等失败自动退临时文件重试）；
+  解码统一走 `common/audio_codec.py`（与主干同一份实现）：
+  soundfile 主路径，解不动的走 ffmpeg 兜底（管道直解优先，失败退临时文件重试）；
   最终统一转写为 PCM_16 WAV 落盘，引擎侧只面对 wav。
   ffmpeg 查找顺序：环境变量 `CLONE_FFMPEG` → 引擎整合包 → 系统 PATH。
+- **展示名归一**：上传后文件名统一改为 .wav（如 `song.mp3` → `song.wav`），
+  表示已完成自动转换。
 - **时长**：5–10 秒清晰人声（受理 2–15s）
 - **必须填写参考文本**（这段音频说了什么）——参与音色与韵律对齐，
   空文本会明显劣化克隆质量
 - 文件落盘 `wavs/`，索引 `wavs/refs.json`；均不入库（根 .gitignore）
+
+## 音色保存与导入（.clone 文件）
+
+- **导出**：`GET /refs/{id}/export`（主干 `/api/clone/refs/{id}/export` 代理），
+  前端「导出音色」按钮下载 `<音色名>.clone`。
+- **格式**：ZIP 容器（后缀 .clone），内含 `voice.json`（音色名、参考文本、
+  预设合成文本、时长/采样率）+ `ref.wav`。**不含任何模型权重**——zero-shot
+  克隆只需参考音频，导入方无需安装引擎即可还原配置。
+- **导入**：`POST /refs/import`（主干 `/api/clone/refs/import` 代理），
+  还原为一条参考音频 + 参考文本；若包内带预设合成文本，前端选中后自动填入
+  合成文本框。
+- 预设合成文本 = 该音色最近一次成功合成的文本（合成时自动记录）。
 
 ## 冒烟验证（手动）
 

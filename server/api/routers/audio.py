@@ -10,6 +10,7 @@ import re
 from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile
 from fastapi.responses import Response
 
+from common.audio_codec import normalize_extension
 from server.api.deps import require_entry
 from server.core.analysis.spectrum import waveform_envelope
 from server.core.io.audio_file import dump_audio, load_audio
@@ -93,7 +94,7 @@ def list_devices() -> DeviceListResponse:
     return DeviceListResponse(items=items, default_index=default_index)
 
 
-@router.post("/upload", response_model=AudioMeta, summary="上传音频文件")
+@router.post("/upload", response_model=AudioMeta, summary="上传音频文件（任意常见格式，自动转 WAV）")
 async def upload_audio(file: UploadFile = File(...)) -> AudioMeta:
     payload = await file.read()
     if not payload:
@@ -101,10 +102,12 @@ async def upload_audio(file: UploadFile = File(...)) -> AudioMeta:
 
     try:
         data, sample_rate = load_audio(payload)
-    except Exception as exc:  # soundfile 的异常类型不统一，统一收敛为 415
+    except Exception as exc:  # 解码失败统一收敛为 415（含不支持的扩展名）
         raise HTTPException(status_code=415, detail=f"无法解码音频文件: {exc}") from exc
 
-    entry = get_store().put(data, sample_rate, label=file.filename or "上传音频")
+    # 上传统一转 WAV：解码成功即入库，展示名同步归一为 .wav（见 common/audio_codec）
+    label = normalize_extension(file.filename or "") or "上传音频"
+    entry = get_store().put(data, sample_rate, label=label)
     return entry.to_meta()
 
 

@@ -8,9 +8,11 @@
 from __future__ import annotations
 
 import io
+from urllib.parse import quote
 
 import soundfile as sf
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi.responses import Response
 
 from server.schemas import (
     CloneRefListResponse,
@@ -79,6 +81,41 @@ def update_ref(ref_id: str, body: CloneRefPromptUpdate) -> CloneRefMeta:
 def delete_ref(ref_id: str) -> None:
     try:
         get_provider().delete_ref(ref_id)
+    except ProviderError as exc:
+        raise _provider_error(exc) from exc
+
+
+@router.get("/refs/{ref_id}/export", summary="导出音色为 .clone 文件")
+def export_ref(ref_id: str) -> Response:
+    """参考音频 + 参考文本 + 预设合成文本打包为 .clone（ZIP 容器），不含模型权重。"""
+    provider = get_provider()
+    try:
+        payload = provider.export_ref(ref_id)
+        refs = {r.ref_id: r for r in provider.list_refs()}
+        record = refs.get(ref_id)
+    except ProviderError as exc:
+        raise _provider_error(exc) from exc
+
+    voice_name = record.filename.rsplit(".", 1)[0] if record else "voice"
+    suggested = f"{voice_name}.clone"
+    ascii_fallback = suggested.encode("ascii", "ignore").decode() or "voice.clone"
+    disposition = (
+        f'attachment; filename="{ascii_fallback}"; '
+        f"filename*=UTF-8''{quote(suggested)}"
+    )
+    return Response(
+        content=payload,
+        media_type="application/octet-stream",
+        headers={"Content-Disposition": disposition},
+    )
+
+
+@router.post(
+    "/refs/import", response_model=CloneRefMeta, summary="导入 .clone 音色文件"
+)
+def import_ref(file: UploadFile = File(...)) -> CloneRefMeta:
+    try:
+        return get_provider().import_ref(file.file.read(), file.filename or "")
     except ProviderError as exc:
         raise _provider_error(exc) from exc
 

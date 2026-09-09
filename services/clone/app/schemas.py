@@ -15,10 +15,11 @@ class RefMeta(BaseModel):
     """参考音频元数据。波形本体只存磁盘文件，接口只传 ref_id。"""
 
     ref_id: str
-    filename: str = Field(description="上传时的原始文件名，仅用于展示")
+    filename: str = Field(description="展示文件名（上传后统一归一为 .wav）")
     duration: float
     sample_rate: int
     prompt_text: str = Field(default="", description="参考音频对应的文字内容")
+    sample_text: str = Field(default="", description="最近一次为该音色合成的文本")
     created_at: datetime
 
 
