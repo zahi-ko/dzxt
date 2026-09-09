@@ -17,7 +17,6 @@ const selectedRefId = ref('')
 const promptText = ref('')
 // 合成文本持久记忆（localStorage）：重开程序沿用上一次输入
 const newText = ref(loadLastText())
-const uploadPrompt = ref('')
 const busy = ref(false)
 const uploading = ref(false)
 const importing = ref(false)
@@ -172,8 +171,7 @@ async function uploadRef(event: Event) {
   if (!file) return
   uploading.value = true
   try {
-    const meta = await api.cloneUploadRef(file, uploadPrompt.value)
-    uploadPrompt.value = ''
+    const meta = await api.cloneUploadRef(file)
     await refreshRefs()
     selectedRefId.value = meta.ref_id
   } catch (error) {
@@ -283,10 +281,6 @@ onMounted(() => {
       <span v-if="uploading" class="hint">上传中…</span>
     </div>
     <p class="hint">支持 wav / mp3 / flac / ogg / opus / m4a / aac / wma / webm / aiff，上传后自动转为 wav</p>
-    <div class="field">
-      <label>新参考音的文本（可选，上传时一并提交）</label>
-      <input v-model="uploadPrompt" type="text" placeholder="这段参考音频说了什么" />
-    </div>
 
     <div class="field">
       <label>导入音色（.clone 文件，含参考音频与文本）</label>
@@ -298,8 +292,8 @@ onMounted(() => {
 
     <template v-if="selectedRef">
       <div class="field">
-        <label>参考文本（参与音色与韵律对齐，强烈建议填写；失焦自动保存到当前参考音）</label>
-        <textarea v-model="promptText" rows="2" placeholder="参考音频的文字内容" @blur="savePromptOnBlur"></textarea>
+        <label>Prompt Text · 参考音频原文（照抄这段录音里说的话；失焦自动保存）</label>
+        <textarea v-model="promptText" rows="2" placeholder="例如录音里说的是「今天天气真好」，就原样填这句" @blur="savePromptOnBlur"></textarea>
       </div>
       <div class="ref-actions">
         <button class="mini" @click="exportClone">导出音色 (.clone)</button>
@@ -308,7 +302,7 @@ onMounted(() => {
     </template>
 
     <div class="field">
-      <label>合成文本（500 字以内，过长建议分段）</label>
+      <label>合成文本（录音里没有的话，想让 TA 说的新台词；500 字以内）</label>
       <textarea v-model="newText" rows="3" placeholder="输入要让 TA 说的话"></textarea>
     </div>
 

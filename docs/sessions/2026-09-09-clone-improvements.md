@@ -118,3 +118,16 @@
   合成文本改「合成文本 Text · 想让音色说的话」，textLang 标签同步；
   合成框上方加一行分工说明（Prompt Text 决定音色，Text 决定产出内容）。
 - README 同步旧 UI 名称引用；前端 build 过，ruff + pytest 87 全过。
+
+---
+
+## 追加 6：删除上传时的 Prompt Text 输入框（同日 22 点）
+
+- 用户质疑「一样的东西整两个」：上传框与编辑框确实都是 prompt_text 的入口。
+- 复查发现昨晚的改名提交漏改了两个关键标签（上传框仍为「新参考音的文本」、
+  编辑框仍为「参考文本」），是用户持续困惑的直接原因。
+- 处理：删除上传时的 Prompt Text 输入框及 uploadPrompt 状态，
+  api.cloneUploadRef 收敛为单参数（后端 Form prompt_text 默认空串，契约不变）；
+  编辑框成为唯一入口，标签改「Prompt Text · 参考音频原文（照抄这段录音里说的话）」，
+  合成文本标签补「录音里没有的话，想让 TA 说的新台词」强化对比。
+- build / ruff / pytest 87 全过。

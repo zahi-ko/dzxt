@@ -267,10 +267,9 @@ export const api = {
 
   cloneStatus: () => request<CloneStatusResponse>('/clone/status'),
   cloneRefs: () => request<CloneRefListResponse>('/clone/refs'),
-  cloneUploadRef: (file: File, promptText: string) => {
+  cloneUploadRef: (file: File) => {
     const form = new FormData()
     form.append('file', file)
-    form.append('prompt_text', promptText)
     return request<CloneRefMeta>('/clone/refs', { method: 'POST', body: form })
   },
   cloneUpdateRef: (refId: string, promptText: string) =>
