@@ -145,6 +145,12 @@ function onMouseUp(event: MouseEvent) {
   })
 }
 
+// 画布配色跟随全局 CSS 变量（--scope-*），换主题无需改组件
+function scope(name: string, fallback: string): string {
+  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+  return value || fallback
+}
+
 function draw() {
   const el = canvas.value
   if (!el) return
@@ -161,11 +167,19 @@ function draw() {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
   ctx.clearRect(0, 0, width, height)
 
-  ctx.fillStyle = '#12151c'
+  const cBg = scope('--scope-bg', '#12151c')
+  const cGrid = scope('--scope-grid', '#232936')
+  const cText = scope('--scope-text', '#5c6478')
+  const cSel = scope('--scope-sel', 'rgba(76, 141, 255, 0.18)')
+  const cSelLine = scope('--scope-sel-line', 'rgba(76, 141, 255, 0.55)')
+  const cWave = scope('--scope-wave', '#4c8dff')
+  const cPlay = scope('--scope-playhead', '#ef6b6b')
+
+  ctx.fillStyle = cBg
   ctx.fillRect(0, 0, width, height)
 
   const mid = height / 2
-  ctx.strokeStyle = '#232936'
+  ctx.strokeStyle = cGrid
   ctx.lineWidth = 1
   ctx.beginPath()
   ctx.moveTo(0, mid)
@@ -174,7 +188,7 @@ function draw() {
 
   const count = props.minimum.length
   if (count === 0) {
-    ctx.fillStyle = '#5c6478'
+    ctx.fillStyle = cText
     ctx.font = '13px system-ui, sans-serif'
     ctx.textAlign = 'center'
     ctx.fillText('暂无音频，请先录音或上传文件', width / 2, mid - 8)
@@ -193,9 +207,9 @@ function draw() {
     const eIdx = (selection.end / props.duration) * count
     const sx = Math.max(0, Math.min(width, ((sIdx - i0) / Math.max(1, visible - 1)) * width))
     const ex = Math.max(0, Math.min(width, ((eIdx - i0) / Math.max(1, visible - 1)) * width))
-    ctx.fillStyle = 'rgba(76, 141, 255, 0.18)'
+    ctx.fillStyle = cSel
     ctx.fillRect(sx, 0, Math.max(1, ex - sx), height)
-    ctx.strokeStyle = 'rgba(76, 141, 255, 0.55)'
+    ctx.strokeStyle = cSelLine
     ctx.beginPath()
     ctx.moveTo(sx, 0)
     ctx.lineTo(sx, height)
@@ -205,7 +219,7 @@ function draw() {
   }
 
   const amp = mid * 0.92
-  ctx.strokeStyle = '#4c8dff'
+  ctx.strokeStyle = cWave
   ctx.lineWidth = 1
   ctx.beginPath()
   for (let i = i0; i < i1; i += 1) {
@@ -221,7 +235,7 @@ function draw() {
     const pIdx = (props.playhead / props.duration) * count
     const px = ((pIdx - i0) / Math.max(1, visible - 1)) * width
     if (px >= 0 && px <= width) {
-      ctx.strokeStyle = '#ef6b6b'
+      ctx.strokeStyle = cPlay
       ctx.lineWidth = 1.5
       ctx.beginPath()
       ctx.moveTo(px, 0)
@@ -231,14 +245,14 @@ function draw() {
   }
 
   // 时间刻度：按可视区间自适应，避免缩放到毫秒级时标签糊成一片
-  ctx.fillStyle = '#5c6478'
+  ctx.fillStyle = cText
   ctx.font = '11px system-ui, sans-serif'
   const spanSec = (viewEnd.value - viewStart.value) * props.duration
   for (let i = 0; i <= 4; i += 1) {
     const ratio = i / 4
     const seconds = (viewStart.value + (viewEnd.value - viewStart.value) * ratio) * props.duration
     const x = ratio * width
-    ctx.strokeStyle = '#1c2130'
+    ctx.strokeStyle = cGrid
     ctx.beginPath()
     ctx.moveTo(x, height - 12)
     ctx.lineTo(x, height)

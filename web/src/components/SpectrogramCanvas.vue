@@ -31,6 +31,12 @@ function colorMap(value: number): [number, number, number] {
   return [255, Math.round(210 - (t - 0.75) * 4 * 150), 40]
 }
 
+// 画布配色跟随全局 CSS 变量（--scope-*），换主题无需改组件
+function scope(name: string, fallback: string): string {
+  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+  return value || fallback
+}
+
 function draw() {
   const el = canvas.value
   if (!el) return
@@ -44,13 +50,16 @@ function draw() {
   el.width = Math.round(width * dpr)
   el.height = Math.round(height * dpr)
 
+  const cBg = scope('--scope-bg', '#12151c')
+  const cText = scope('--scope-text', '#5c6478')
+
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
   ctx.clearRect(0, 0, width, height)
-  ctx.fillStyle = '#12151c'
+  ctx.fillStyle = cBg
   ctx.fillRect(0, 0, width, height)
 
   if (props.frames === 0 || props.bins === 0 || props.data.length === 0) {
-    ctx.fillStyle = '#5c6478'
+    ctx.fillStyle = cText
     ctx.font = '13px system-ui, sans-serif'
     ctx.textAlign = 'center'
     ctx.fillText('暂无语谱图数据', width / 2, height / 2)
@@ -81,7 +90,7 @@ function draw() {
   ctx.drawImage(buffer, 0, 0, props.frames, props.bins, 0, 0, width, height)
   ctx.restore()
 
-  ctx.fillStyle = '#5c6478'
+  ctx.fillStyle = cText
   ctx.font = '12px system-ui, sans-serif'
   ctx.textAlign = 'left'
   ctx.fillText('0 Hz', 6, height - 6)

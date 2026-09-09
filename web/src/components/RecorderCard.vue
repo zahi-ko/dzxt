@@ -282,8 +282,8 @@ onUnmounted(() => {
 .meter {
   position: relative;
   height: 10px;
-  background: #0d1016;
-  border: 1px solid var(--border);
+  background: var(--scope-bg);
+  border: none;
   border-radius: 5px;
   overflow: hidden;
   margin-bottom: 6px;
@@ -292,7 +292,7 @@ onUnmounted(() => {
 
 .meter-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--teal), var(--accent));
+  background: linear-gradient(90deg, var(--scope-wave), var(--accent));
   transition: width 0.08s linear;
 }
 

@@ -14,6 +14,12 @@ const props = withDefaults(
 
 const canvas = ref<HTMLCanvasElement | null>(null)
 
+// 画布配色跟随全局 CSS 变量（--scope-*），换主题无需改组件
+function scope(name: string, fallback: string): string {
+  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+  return value || fallback
+}
+
 function draw() {
   const el = canvas.value
   if (!el) return
@@ -30,12 +36,17 @@ function draw() {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
   ctx.clearRect(0, 0, width, height)
 
-  ctx.fillStyle = '#12151c'
+  const cBg = scope('--scope-bg', '#12151c')
+  const cGrid = scope('--scope-grid', '#232936')
+  const cText = scope('--scope-text', '#5c6478')
+  const cWave = scope('--scope-wave', '#2dd4bf')
+
+  ctx.fillStyle = cBg
   ctx.fillRect(0, 0, width, height)
 
   const count = props.freqs.length
   if (count === 0) {
-    ctx.fillStyle = '#5c6478'
+    ctx.fillStyle = cText
     ctx.font = '13px system-ui, sans-serif'
     ctx.textAlign = 'center'
     ctx.fillText('暂无频谱数据', width / 2, height / 2)
@@ -50,7 +61,7 @@ function draw() {
     return height - ((clamped - floorDb) / (ceilingDb - floorDb)) * height
   }
 
-  ctx.strokeStyle = '#232936'
+  ctx.strokeStyle = cGrid
   ctx.lineWidth = 1
   for (let i = 1; i < 4; i += 1) {
     const y = (height / 4) * i
@@ -70,12 +81,12 @@ function draw() {
   ctx.closePath()
 
   const gradient = ctx.createLinearGradient(0, 0, 0, height)
-  gradient.addColorStop(0, 'rgba(45, 212, 191, 0.55)')
-  gradient.addColorStop(1, 'rgba(45, 212, 191, 0.04)')
+  gradient.addColorStop(0, scope('--scope-wave-fill', 'rgba(45, 212, 191, 0.55)'))
+  gradient.addColorStop(1, scope('--scope-wave-fill-end', 'rgba(45, 212, 191, 0.04)'))
   ctx.fillStyle = gradient
   ctx.fill()
 
-  ctx.strokeStyle = '#2dd4bf'
+  ctx.strokeStyle = cWave
   ctx.lineWidth = 1.2
   ctx.beginPath()
   for (let i = 0; i < count; i += 1) {
@@ -86,7 +97,7 @@ function draw() {
   }
   ctx.stroke()
 
-  ctx.fillStyle = '#5c6478'
+  ctx.fillStyle = cText
   ctx.font = '12px system-ui, sans-serif'
   ctx.textAlign = 'left'
   ctx.fillText('0 Hz', 6, height - 6)

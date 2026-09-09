@@ -233,19 +233,18 @@ onMounted(async () => {
   <div class="app">
     <header class="app-header">
       <div class="brand">
-        <span class="brand-mark" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-            <path d="M4 12v0M8 8v8M12 5v14M16 8v8M20 12v0" />
-          </svg>
-        </span>
+        <span class="brand-mark" aria-hidden="true">声</span>
         <div class="brand-text">
           <h1>语音处理系统</h1>
-          <p class="brand-sub">采集 · 处理 · 分析 · 播放</p>
+          <p class="brand-sub">Voice Processing Studio · 采集 · 处理 · 分析 · 播放</p>
         </div>
       </div>
-      <span class="status-pill" :class="{ on: online }">
-        <span class="dot"></span>{{ statusText }}
-      </span>
+      <div class="header-side">
+        <span class="header-meta mono">STUDIO CONSOLE</span>
+        <span class="status-pill" :class="{ on: online }">
+          <span class="dot"></span>{{ statusText }}
+        </span>
+      </div>
     </header>
 
     <transition name="fade">
@@ -359,12 +358,7 @@ onMounted(async () => {
       <h2 class="section-title">拓展功能</h2>
       <div class="ext-grid">
         <button class="ext-card" @click="cloneOpen = true">
-          <span class="ext-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="9" y="3" width="6" height="11" rx="3" />
-              <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
-            </svg>
-          </span>
+          <span class="ext-no" aria-hidden="true">01</span>
           <span class="ext-body">
             <span class="ext-name">语音克隆</span>
             <span class="ext-desc">上传参考音频，合成同款音色</span>
@@ -373,11 +367,7 @@ onMounted(async () => {
         </button>
 
         <button class="ext-card" disabled title="阶段三待开发">
-          <span class="ext-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M3 12h4l2-6 4 12 2-6h6" />
-            </svg>
-          </span>
+          <span class="ext-no" aria-hidden="true">02</span>
           <span class="ext-body">
             <span class="ext-name">录音质量检测</span>
             <span class="ext-desc">音量 / 爆音 / 噪声综合评估</span>
@@ -386,13 +376,7 @@ onMounted(async () => {
         </button>
 
         <button class="ext-card" disabled title="阶段三待开发">
-          <span class="ext-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M4 14c2-3 4-3 6 0s4 3 6 0 3-2 4-1" />
-              <path d="M4 19c2-3 4-3 6 0s4 3 6 0 3-2 4-1" opacity="0.5" />
-              <path d="M12 3v5m0 0 2-2m-2 2-2-2" />
-            </svg>
-          </span>
+          <span class="ext-no" aria-hidden="true">03</span>
           <span class="ext-body">
             <span class="ext-name">语音加噪与降噪</span>
             <span class="ext-desc">可调信噪比的闭环验证</span>
@@ -424,52 +408,66 @@ onMounted(async () => {
 .app {
   max-width: 1440px;
   margin: 0 auto;
-  padding: 18px 24px 48px;
+  padding: 26px 32px 56px;
 }
 
-/* ---------- 顶栏 ---------- */
+/* ---------- 顶栏 · 编辑级刊头 ---------- */
 .app-header {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
+  padding-bottom: 18px;
   margin-bottom: 16px;
+  border-bottom: 2px solid var(--text);
 }
 
 .brand {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
 }
 
 .brand-mark {
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
+  width: 44px;
+  height: 44px;
   display: grid;
   place-items: center;
-  color: #fff;
-  background: linear-gradient(135deg, var(--accent), var(--teal));
-  box-shadow: 0 4px 14px var(--accent-glow);
+  background: var(--text);
+  color: var(--panel);
+  font-family: var(--font-serif);
+  font-size: 22px;
+  line-height: 1;
+  border-radius: 4px;
   flex: 0 0 auto;
 }
 
-.brand-mark svg {
-  width: 20px;
-  height: 20px;
-}
-
 .brand-text h1 {
-  font-size: 17px;
-  font-weight: 600;
+  font-family: var(--font-serif);
+  font-size: 30px;
+  font-weight: 700;
   margin: 0;
-  letter-spacing: 0.02em;
+  line-height: 1.15;
+  letter-spacing: 0.04em;
 }
 
 .brand-sub {
-  margin: 0;
+  margin: 3px 0 0;
   font-size: 11px;
   color: var(--text-faint);
-  letter-spacing: 0.14em;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.header-side {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.header-meta {
+  font-size: 11px;
+  color: var(--text-faint);
+  letter-spacing: 0.22em;
 }
 
 .status-pill {
@@ -477,9 +475,9 @@ onMounted(async () => {
   align-items: center;
   gap: 7px;
   font-size: 12px;
-  padding: 4px 12px;
+  padding: 3px 12px;
   border-radius: 999px;
-  border: 1px solid rgba(240, 112, 112, 0.35);
+  border: 1px solid var(--danger);
   background: var(--danger-soft);
   color: var(--danger);
 }
@@ -492,7 +490,7 @@ onMounted(async () => {
 }
 
 .status-pill.on {
-  border-color: rgba(45, 212, 191, 0.35);
+  border-color: var(--teal);
   background: var(--teal-soft);
   color: var(--teal);
 }
@@ -501,8 +499,9 @@ onMounted(async () => {
 .error {
   margin: 0 0 14px;
   padding: 8px 12px;
-  border: 1px solid rgba(240, 112, 112, 0.4);
-  border-radius: var(--radius-sm);
+  border: 1px solid var(--danger);
+  border-left-width: 4px;
+  border-radius: var(--radius-xs);
   background: var(--danger-soft);
   color: var(--danger);
   font-size: 13px;
@@ -520,46 +519,45 @@ onMounted(async () => {
 
 /* ---------- 三栏 ---------- */
 .player-bar {
-  margin-bottom: 16px;
+  margin-bottom: 18px;
 }
 
 .layout {
   display: grid;
   grid-template-columns: 300px minmax(0, 1fr) 300px;
-  gap: 16px;
+  gap: 18px;
   align-items: start;
 }
 
 .col {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 18px;
   min-width: 0;
 }
 
-/* ---------- 分析标签页 ---------- */
+/* ---------- 分析标签页 · 下划线式 ---------- */
 .selection-hint {
   color: var(--accent);
+  font-weight: 500;
 }
 
 .tabs {
   display: flex;
-  gap: 4px;
-  padding: 3px;
-  background: var(--panel-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  gap: 22px;
+  border-bottom: 1px solid var(--border);
   margin-bottom: 12px;
-  width: fit-content;
 }
 
 .tabs button {
   border: none;
   background: transparent;
-  padding: 5px 14px;
-  border-radius: var(--radius-xs);
-  font-size: 12px;
+  padding: 0 2px 8px;
+  font-size: 13px;
   color: var(--text-dim);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  border-radius: 0;
 }
 
 .tabs button:hover:not(:disabled) {
@@ -568,85 +566,75 @@ onMounted(async () => {
 }
 
 .tabs button.active {
-  background: var(--accent-soft);
   color: var(--accent);
   font-weight: 600;
+  border-bottom-color: var(--accent);
 }
 
 .tab-body {
   min-width: 0;
 }
 
-/* ---------- 拓展功能卡片 ---------- */
+/* ---------- 拓展功能卡片 · 编号目录式 ---------- */
 .extensions {
-  margin-top: 20px;
+  margin-top: 26px;
+  padding-top: 16px;
+  border-top: 2px solid var(--text);
 }
 
 .section-title {
-  font-size: 13px;
-  font-weight: 600;
-  margin: 0 0 10px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.section-title::before {
-  content: '';
-  width: 3px;
-  height: 13px;
-  border-radius: 2px;
-  background: linear-gradient(180deg, var(--accent), var(--teal));
+  font-family: var(--font-serif);
+  font-size: 17px;
+  font-weight: 700;
+  margin: 0 0 12px;
+  letter-spacing: 0.04em;
 }
 
 .ext-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
 }
 
 .ext-card {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 14px 16px;
+  gap: 16px;
+  padding: 18px 18px;
   text-align: left;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent), var(--panel);
+  background: var(--panel);
   border: 1px solid var(--border);
   border-radius: var(--radius);
+  box-shadow: var(--shadow-soft);
   transition: border-color 0.15s, box-shadow 0.15s, transform 0.1s;
 }
 
 .ext-card:hover:not(:disabled) {
-  border-color: rgba(91, 140, 255, 0.5);
-  box-shadow: 0 4px 18px rgba(91, 140, 255, 0.15);
-  transform: translateY(-1px);
+  border-color: var(--accent);
+  box-shadow: 0 6px 20px rgba(201, 64, 28, 0.12);
+  transform: translateY(-2px);
+  color: var(--text);
+  background: var(--panel);
 }
 
 .ext-card:disabled {
-  opacity: 0.55;
+  opacity: 0.5;
 }
 
-.ext-icon {
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
-  display: grid;
-  place-items: center;
-  flex: 0 0 auto;
+.ext-no {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 30px;
+  line-height: 1;
   color: var(--accent);
-  background: var(--accent-soft);
-}
-
-.ext-icon svg {
-  width: 19px;
-  height: 19px;
+  flex: 0 0 auto;
+  min-width: 44px;
 }
 
 .ext-body {
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 2px;
   min-width: 0;
   flex: 1 1 auto;
 }
@@ -667,25 +655,25 @@ onMounted(async () => {
   font-size: 11px;
   padding: 2px 10px;
   border-radius: 999px;
-  border: 1px solid rgba(240, 112, 112, 0.35);
+  border: 1px solid var(--danger);
   background: var(--danger-soft);
   color: var(--danger);
 }
 
 .ext-badge.on {
-  border-color: rgba(45, 212, 191, 0.35);
+  border-color: var(--teal);
   background: var(--teal-soft);
   color: var(--teal);
 }
 
 .ext-badge.partial {
-  border-color: rgba(229, 168, 61, 0.35);
+  border-color: var(--warn);
   background: var(--warn-soft);
   color: var(--warn);
 }
 
 .ext-badge.todo {
-  border-color: var(--border);
+  border-color: var(--border-strong);
   background: var(--panel-2);
   color: var(--text-faint);
 }
@@ -702,16 +690,15 @@ onMounted(async () => {
 .drawer-mask {
   position: absolute;
   inset: 0;
-  background: rgba(4, 6, 10, 0.55);
-  backdrop-filter: blur(2px);
+  background: rgba(37, 34, 28, 0.4);
 }
 
 .drawer {
   position: relative;
   width: min(400px, 92vw);
   height: 100%;
-  background: var(--panel);
-  border-left: 1px solid var(--border);
+  background: var(--bg);
+  border-left: 2px solid var(--text);
   box-shadow: var(--shadow);
   display: flex;
   flex-direction: column;
@@ -719,16 +706,18 @@ onMounted(async () => {
 
 .drawer-head {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   justify-content: space-between;
-  padding: 14px 18px;
+  padding: 16px 20px;
   border-bottom: 1px solid var(--border);
 }
 
 .drawer-head h2 {
   margin: 0;
-  font-size: 15px;
-  font-weight: 600;
+  font-family: var(--font-serif);
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
 }
 
 .drawer-body {

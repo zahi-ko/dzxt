@@ -93,7 +93,7 @@ li:hover {
 }
 
 li.active {
-  border-color: rgba(91, 140, 255, 0.55);
+  border-color: var(--accent);
   background: var(--accent-soft);
 }
 
