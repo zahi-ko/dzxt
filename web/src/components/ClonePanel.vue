@@ -209,7 +209,7 @@ async function exportClone() {
   }
 }
 
-// 参考文本失焦自动保存：编辑改动直接持久到该参考音记录。
+// Prompt Text（参考音频原文）失焦自动保存：编辑改动直接持久到该参考音记录。
 // 此前编辑框只是临时覆盖不落盘，导出 .clone 会打包到空文本。
 async function savePromptOnBlur() {
   const record = selectedRef.value
