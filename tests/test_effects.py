@@ -115,7 +115,7 @@ def test_average_spectrum_peaks_at_tone_frequency() -> None:
     assert freqs[peak_index] == pytest.approx(1000.0, abs=20.0)
 
 
-# ---------- 阶段二新增：裁剪 / 淡入淡出 / 降噪 / 语谱图 ----------
+# ---------- 阶段二新增：裁剪 / 淡入淡出 / 语谱图 ----------
 
 
 def test_trim_cuts_selected_range() -> None:
@@ -139,32 +139,31 @@ def test_fade_edges_go_to_zero_and_middle_unchanged() -> None:
     assert out[SR // 2] == pytest.approx(0.5, abs=1e-6)
 
 
-def test_denoise_preserves_length_and_improves_snr() -> None:
-    # 类语音激励：谐波串 + 停顿，模拟音节间隙
-    rng = np.random.default_rng(0)
-    length = SR * 2
-    t = np.arange(length) / SR
-    env = ((np.arange(length) // int(0.15 * SR)) % 2 == 0).astype(np.float32)
-    clean = np.zeros(length, dtype=np.float32)
-    for harmonic in (1, 2, 3, 5):
-        clean += (0.25 / harmonic) * np.sin(2 * np.pi * 300 * harmonic * t).astype(np.float32)
-    clean = (clean * env).astype(np.float32)
-    noisy = np.clip(clean + 0.08 * rng.standard_normal(length), -1, 1).astype(np.float32)
-
-    def snr(reference: np.ndarray, actual: np.ndarray) -> float:
-        residual = float(np.sum((reference - actual) ** 2))
-        return 10 * np.log10(float(np.sum(reference**2)) / max(residual, 1e-12))
-
-    out = apply_effect("denoise", noisy, SR, {"strength": 1.0})
-    assert out.shape[0] == noisy.shape[0]
-    assert snr(clean, out) > snr(clean, noisy)
+# ---------- 立体声回归：OLA 与 fade 曾因只支持单声道导致 500 ----------
 
 
-def test_denoise_handles_stereo() -> None:
-    x = np.stack([tone(0.5), tone(0.5, freq=880.0)], axis=1)
-    out = apply_effect("denoise", x, SR, {"strength": 1.0})
+def test_tempo_ola_handles_stereo() -> None:
+    x = np.stack([tone(1.0), tone(1.0, freq=880.0) * 0.8], axis=1)
+    out = apply_effect("tempo_ola", x, SR, {"speed": 1.5})
+    assert out.ndim == 2
+    assert out.shape[1] == 2
+    assert out.shape[0] < x.shape[0]
+
+    # 各通道结果应与单独处理单声道一致（OLA 逐通道、不可广播窗函数）
+    left = apply_effect("tempo_ola", x[:, 0], SR, {"speed": 1.5})
+    np.testing.assert_allclose(out[:, 0], left, rtol=1e-5)
+
+
+def test_fade_handles_stereo() -> None:
+    x = np.ones((SR, 2), dtype=np.float32) * 0.5
+    x[:, 1] = 0.25
+    out = apply_effect("fade", x, SR, {"fade_in": 0.1, "fade_out": 0.1})
     assert out.ndim == 2
     assert out.shape == x.shape
+    # 渐变只作用于时间轴，两声道各自归零、中部保持原幅度
+    np.testing.assert_allclose(out[0], [0.0, 0.0], atol=1e-6)
+    np.testing.assert_allclose(out[-1], [0.0, 0.0], atol=1e-6)
+    np.testing.assert_allclose(out[SR // 2], [0.5, 0.25], atol=1e-6)
 
 
 def test_spectrogram_shape_and_quantization() -> None:

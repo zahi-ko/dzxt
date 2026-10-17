@@ -54,21 +54,14 @@ def tempo_resample(x: np.ndarray, sr: int, params: TempoParams) -> np.ndarray:
     return resample_poly(x, up, down, axis=axis).astype(np.float32)
 
 
-@register_effect(
-    name="tempo_ola",
-    title="倍速（不变调）",
-    description="重叠相加(OLA)时间缩放，时长改变而音高保持不变",
-)
-def tempo_ola(x: np.ndarray, sr: int, params: TempoParams) -> np.ndarray:
-    if abs(params.speed - 1.0) < 1e-3:
-        return x.copy()
-
+def _ola_channel(x: np.ndarray, sr: int, speed: float) -> np.ndarray:
+    """单通道 OLA 时间缩放。x 必须是一维。"""
     frame = int(sr * 0.05)
     if x.shape[0] < frame * 2:
         return x.copy()
 
     analysis_hop = frame // 2
-    synthesis_hop = max(1, int(round(analysis_hop / params.speed)))
+    synthesis_hop = max(1, int(round(analysis_hop / speed)))
     window = np.hanning(frame).astype(np.float32)
 
     n_frames = max(1, (x.shape[0] - frame) // analysis_hop + 1)
@@ -85,6 +78,26 @@ def tempo_ola(x: np.ndarray, sr: int, params: TempoParams) -> np.ndarray:
 
     np.maximum(weight, 1e-6, out=weight)
     return out / weight
+
+
+@register_effect(
+    name="tempo_ola",
+    title="倍速（不变调）",
+    description="重叠相加(OLA)时间缩放，时长改变而音高保持不变",
+)
+def tempo_ola(x: np.ndarray, sr: int, params: TempoParams) -> np.ndarray:
+    if abs(params.speed - 1.0) < 1e-3:
+        return x.copy()
+
+    if x.ndim == 1:
+        return _ola_channel(x, sr, params.speed)
+
+    # 立体声逐通道处理（OLA 不能像 gain 那样直接广播窗函数）
+    channels = [
+        _ola_channel(np.ascontiguousarray(x[:, channel]), sr, params.speed)
+        for channel in range(x.shape[1])
+    ]
+    return np.stack(channels, axis=1)
 
 
 class NormalizeParams(BaseModel):

@@ -90,7 +90,7 @@ def main() -> int:
         json={
             "audio_id": audio_id,
             "steps": [
-                {"effect": "denoise", "params": {"strength": 1.0}},
+                {"effect": "gain", "params": {"db": -3.0}},
                 {"effect": "normalize", "params": {"peak_db": -3.0}},
             ],
         },

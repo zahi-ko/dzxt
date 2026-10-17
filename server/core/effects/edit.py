@@ -45,15 +45,17 @@ class FadeParams(BaseModel):
 def fade(x: np.ndarray, sr: int, params: FadeParams) -> np.ndarray:
     out = np.array(x, dtype=np.float32, copy=True)
     total = out.shape[0]
+    # 立体声 (n, ch) 的渐变必须作用在时间轴上，ramp 需扩出声道维才能广播
+    ramp_shape = (-1,) if out.ndim == 1 else (-1, 1)
 
     in_len = min(total, int(params.fade_in * sr))
     if in_len > 0:
         ramp = np.linspace(0.0, 1.0, in_len, dtype=np.float32) ** params.curve
-        out[:in_len] *= ramp
+        out[:in_len] *= ramp.reshape(ramp_shape)
 
     out_len = min(total - in_len, int(params.fade_out * sr))
     if out_len > 0:
         ramp = np.linspace(1.0, 0.0, out_len, dtype=np.float32) ** params.curve
-        out[-out_len:] *= ramp
+        out[-out_len:] *= ramp.reshape(ramp_shape)
 
     return out

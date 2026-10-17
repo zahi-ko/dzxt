@@ -155,6 +155,26 @@ def test_upload_rejects_garbage(client: TestClient) -> None:
     assert response.status_code == 415
 
 
+def test_apply_stereo_only_effects_via_api(client: TestClient) -> None:
+    """立体声上传后调用 tempo_ola / fade 曾因单声道假设 500。"""
+    t = np.linspace(0, 0.5, 8000, endpoint=False)
+    stereo = np.stack(
+        [0.4 * np.sin(2 * np.pi * 440 * t), 0.3 * np.sin(2 * np.pi * 440 * t)], axis=1
+    ).astype(np.float32)
+    audio_id = client.post(
+        "/api/audio/upload", files={"file": ("s.wav", dump_audio(stereo, 16000), "audio/wav")}
+    ).json()["audio_id"]
+
+    for effect, params in [("tempo_ola", {"speed": 1.5}), ("fade", {"fade_in": 0.05, "fade_out": 0.05})]:
+        response = client.post(
+            "/api/effects/apply",
+            json={"audio_id": audio_id, "effect": effect, "params": params, "save_as_new": False},
+        )
+        assert response.status_code == 200, f"{effect}: {response.text}"
+        audio_id = response.json()["audio_id"]
+        assert client.get(f"/api/analysis/{audio_id}/stats").json()["channels"] == 2
+
+
 # ---------- 阶段二新增：设备 / 效果链 / 历史 / 撤销 / 语谱图 / 流 ----------
 
 
