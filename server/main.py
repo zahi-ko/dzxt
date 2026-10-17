@@ -16,7 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 import server.core.effects  # noqa: F401  导入即触发效果器注册
-from server.api.routers import analysis, audio, clone, effects, realtime
+from server.api.routers import analysis, audio, clone, effects, noise, realtime
 from server.core.registry import list_effects
 from server.schemas import ErrorResponse
 
@@ -43,6 +43,7 @@ app.include_router(audio.router)
 app.include_router(effects.router)
 app.include_router(analysis.router)
 app.include_router(clone.router)
+app.include_router(noise.router)
 app.include_router(realtime.router)
 
 

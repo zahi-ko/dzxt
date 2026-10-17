@@ -278,3 +278,57 @@ class CloneStatusResponse(BaseModel):
     adapter_detail: str = ""
     engine_detail: str = ""
     refs: int = Field(default=0, description="适配层当前参考音频数量")
+
+
+# ---------------------------------------------------------------------------
+# 语音加噪与降噪（3.3）
+#
+# 算法封装在独立子服务 noise-service（独立 git / 独立 venv，位于本仓库之外），
+# 主干经 NoiseProvider 抽象层以 HTTP 对接。契约镜像 noise-service/app/schemas.py。
+# 子服务离线时仅失去加噪/降噪能力，基础功能不受影响。
+# ---------------------------------------------------------------------------
+
+
+class NoiseStatusResponse(BaseModel):
+    """加噪降噪子服务状态。探活失败也返回 200 + online=false，供前端展示离线态。"""
+
+    online: bool
+    detail: str = ""
+
+
+class NoiseOperationInfo(BaseModel):
+    """操作描述。前端据此动态生成参数表单（与效果器注册表同思路）。"""
+
+    name: str = Field(description="操作注册名：add_noise / denoise")
+    title: str
+    description: str
+    params_schema: dict
+
+
+class NoiseOperationListResponse(BaseModel):
+    items: list[NoiseOperationInfo]
+
+
+class NoiseProcessRequest(BaseModel):
+    """加噪/降噪处理请求。音频按句柄制引用，产物同样入库。"""
+
+    audio_id: str
+    operation: str = Field(description="add_noise / denoise")
+    params: dict = Field(default_factory=dict, description="操作参数，结构见 /api/noise/operations")
+
+
+class NoiseProcessResponse(BaseModel):
+    audio_id: str
+    meta: AudioMeta
+    operation: str
+
+
+class NoiseSnrRequest(BaseModel):
+    """闭环验证：同一音频的处理前后两个句柄，计算实际信噪比。"""
+
+    clean_id: str
+    noisy_id: str
+
+
+class NoiseSnrResponse(BaseModel):
+    snr_db: float
