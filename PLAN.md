@@ -87,7 +87,7 @@
 - [x] 倍速播放：变调版（重采样）
 - [x] 倍速播放：不变调版（OLA 时域压扩）
 - [x] 淡入淡出
-- [x] 简易降噪（谱减法）
+- [x] 简易降噪（谱减法）（2026-10-17 起由独立子服务 noise-service 承载，效果器注册表版已移除，见 ADR 0008）
 - [x] 效果链：多个效果按顺序施加，可查看处理历史
 - [x] 处理前后 A/B 对比播放
 
@@ -131,9 +131,15 @@
 
 ### 3.3 语音加噪与降噪
 
-- [ ] 加噪：可调信噪比（SNR）的白噪声叠加，可选常见环境噪声类型
-- [ ] 降噪：谱减法降噪增强（在阶段二 2.3 简易降噪基础上扩展参数与效果）
-- [ ] 闭环验证：同一音频加噪 → 降噪，对比处理前后信噪比与听感，验证结果正确可靠
+> 2026-10-17：改制为独立子服务（ADR 0008），算法来自用户提供的 n1.py 谱减法模块。
+
+- [x] 独立子服务 `noise-service`（2026-10-17：仓库外独立 git + 独立 venv，端口 9910，无状态 FastAPI；`/health` `/operations` `/add-noise` `/denoise` `/snr`；立体声逐通道；测试 29 项）
+- [x] 加噪：可调信噪比（SNR）的白/粉/布朗噪声叠加（`add_noise`：snr_db / noise_type / seed）
+- [x] 降噪：谱减法降噪增强（`denoise`：alpha / beta / frame_ms / hop_ms / noise_est_ratio / noise_frames / gain_smooth；原效果器注册表 `denoise` 已移除）
+- [x] 主干对接：`NoiseProvider` 抽象 + `/api/noise/status|operations|process|snr`，process 产物带血统入库（可撤销、可 A/B 对比）
+- [x] 闭环验证：同一音频加噪 → 降噪，`/api/noise/snr` 对比处理前后信噪比（实测 5.0 → 13.5 dB；服务侧单测覆盖三种噪声的 SNR 命中与提升）
+- [ ] 前端「加噪降噪」面板：操作选择 + 参数表单（按 `/api/noise/operations` 动态生成）+ 处理回流试听 + SNR 对比展示（App 底部「开发中」卡片替换）
+- [ ] 主观听感验证（答辩演示用）
 
 ### 3.4 系统集成
 

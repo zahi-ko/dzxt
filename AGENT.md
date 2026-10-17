@@ -64,6 +64,10 @@ api_v2.py 端口 9880），适配层为轻量 FastAPI（端口 9900，独立 ven
 主干经 `TTSProvider` 抽象层以 HTTP 对接。详见 `docs/adr/0004-voice-clone-local.md`
 （含 2026-09-08 实施修订）。
 
+**语音加噪与降噪子服务**（`noise-service/`，**仓库外独立项目**，端口 9910）：
+谱减法加噪/降噪的无状态 FastAPI 服务（独立 git、独立 venv，Python 3.11），
+主干经 `NoiseProvider` 抽象层以 HTTP 对接。详见 `docs/adr/0008-noise-standalone-service.md`。
+
 ---
 
 ## 3. 环境与启动
@@ -112,6 +116,31 @@ cd C:\Users\zahi\Desktop\dzxt\services\clone
 
 本机为 **NVIDIA RTX 4060 Laptop / 8GB 显存**，满足 GPT-SoVITS 推理需求。
 换机器开发时，先跑 `nvidia-smi` 确认显存是否 ≥ 6GB。
+
+### 3.5 语音加噪与降噪子服务（3.3，拓展功能）
+
+**仓库外独立项目**：`C:\Users\zahi\Desktop\noise-service`（独立 git + 独立 venv，
+按 ADR 0008 不与本项目共享 git）。无状态、不落盘、不含模型；离线时主干仅失去
+加噪/降噪能力，基础功能不受影响。
+
+```powershell
+# 终端 · 加噪降噪子服务（默认 127.0.0.1:9910）
+cd C:\Users\zahi\Desktop\noise-service
+.venv\Scripts\python.exe main.py
+```
+
+- 首次部署：`uv venv --python 3.11 .venv` → `uv sync`（见服务内 README）
+- 环境变量：子服务侧 `NOISE_ADAPTER_HOST/PORT`、`NOISE_MAX_UPLOAD_MB`；
+  主干指向 `NOISE_SERVICE_URL`（默认 `http://127.0.0.1:9910`）
+- 主干接口（前端只与主干通信）：`GET /api/noise/status`、
+  `GET /api/noise/operations`（操作与参数 Schema，前端动态表单依据）、
+  `POST /api/noise/process`（`{audio_id, operation, params}`，产物带血统入库、
+  可撤销可对比）、`POST /api/noise/snr`（`{clean_id, noisy_id}`，闭环验证）
+- 操作：`add_noise`（snr_db 目标信噪比 / noise_type 白粉布朗 / seed）、
+  `denoise`（谱减 alpha/beta/frame_ms/hop_ms/noise_est_ratio/noise_frames/gain_smooth）
+- 闭环验证：同一音频 加噪 → 降噪，对「原始 vs 加噪」「原始 vs 降噪」各调一次
+  `/api/noise/snr`，断言降噪后 SNR 显著提升（实测 5.0 → 13.5 dB）
+- 原效果器注册表中的 `denoise`（阶段二简易谱减）已移除，谱减能力由本服务承载
 
 ---
 
@@ -321,6 +350,7 @@ uv run python scripts/smoke.py   # 端到端冒烟：采集→显示→处理→
 - [x] 阶段二功能开发（2026-09-07）：采集（设备/声道/WS 电平/定时停止）、显示（波形缩放选区/频谱/语谱图/信息卡）、处理（淡入淡出/谱减降噪/效果链/历史撤销/A-B 对比）、播放（流端点 + 播放器条），测试 46 项 + 冒烟脚本
 - [x] 运行期问题排查 5 项（2026-09-07，见变更日志最新行）：空 src 误报 / 流端点 Range 缺失导致 seek 失效 / 多次录音同名 / mp3 尾部解码失败 / vite 代理端口硬编码；测试 46 → 49 项，提交 `327d1f5`
 - [x] 3.1 语音克隆环境与链路（2026-09-08）：GPT-SoVITS 整合包引擎就位（v2 + CUDA + fp16，api_v2 端口 9880）；`services/clone` 轻量适配层（独立 venv 无 torch，参考音频托管 + 合成转发，端口 9900）；主干 `TTSProvider` 抽象（含云端插槽）与 `/api/clone/*` 路由（合成产物直接入库句柄制）；前端 `ClonePanel`（参考音上传/管理、参考文本、合成、回流试听导出）；子服务离线 503 降级不拖垮基础功能；实测修复 httpx 系统代理劫持回环调用的坑（trust_env=False）；测试 50 → 59 项
+- [x] 3.3 语音加噪与降噪 · 服务与主干接口（2026-10-17，ADR 0008）：独立子服务 `noise-service`（仓库外，独立 git/venv，端口 9910，无状态 FastAPI，封装 n1.py 谱减法：可调 SNR 加噪[白/粉/布朗] + 谱减降噪 + SNR 评估，立体声逐通道）；主干 `NoiseProvider` 抽象 + `/api/noise/status|operations|process|snr`（process 产物带血统入库可撤销）；移除效果器注册表原 `denoise`；实测闭环 5.0 → 13.5 dB；测试 88 → 101 项。**遗留**：前端「加噪降噪」卡片仍为开发中占位，待按 `/api/noise/*` 开发面板
 - [ ] 阶段三拓展功能（3.1 语音克隆 / 3.2 录音质量检测 / 3.3 语音加噪与降噪）
 
 ### 阶段二补充约定
@@ -367,3 +397,5 @@ uv run python scripts/smoke.py   # 端到端冒烟：采集→显示→处理→
 | 2026-09-09 | 克隆合成参数扩展 + 记忆式默认：引擎可调参数从 3 项扩到 11 项——新增文本切分 `text_split_method`（cut0–cut5）、批大小 `batch_size`、句间停顿 `fragment_interval`、采样温度 `temperature`、`top_k`/`top_p`、重复惩罚 `repetition_penalty`、随机种子 `seed`（默认值与引擎 api_v2 `TTS_Request` 对齐，主干/适配层 schema 镜像透传）；ClonePanel 新增「高级参数」折叠区，每项括号注明效用；参数与选中参考音走 localStorage 记忆（`dzxt.clone-params.v1` / `dzxt.clone-last-ref.v1`），下次打开沿用上一次的值，另有「恢复默认参数」；新增测试 3 项（主干透传/默认兼容/适配层 payload 转发），pytest 82 → 85 项全过，ruff 通过，前端 build 通过 | zahiko |
 | 2026-09-09 | 修复引擎警告「Prompt free is not supported batch_infer!」：根因为参考文本为空时引擎 prompt-free 模式不支持批量，`batch_size>1` 被静默降级为逐句推理——适配层在有效参考文本为空时强制归一 `batch_size=1`（消除无效批量与告警噪音），前端批大小标签注明「仅填写参考文本时生效」；另修复离线降级测试的环境依赖（假设 9900 无监听，本机适配层运行时被真服务穿透）——`client` fixture 改为注入指向 `127.0.0.1:1` 的真 Provider，离线路径可复现；pytest 85 → 86 项全过，ruff 通过，前端 build 通过 | zahiko |
 | 2026-09-08 | 3.1 语音克隆环境与全链路：引擎采用官方整合包（`C:\Users\zahi\.venvs\GPT-SoVITS-v2pro-20250604`，v2+CUDA+fp16，api_v2 端口 9880，ADR 0004 补实施修订——适配层不含 torch）；新增 `services/clone` 适配层（FastAPI 9900，参考音频 2–15s 校验落盘 + JSON 索引持久化 + /tts 转发）；主干新增 `server/tts_provider.py`（TTSProvider ABC + LocalAdapterProvider + 云端插槽）与 `api/routers/clone.py`（/api/clone/status、refs CRUD 代理、synthesize 产物入库句柄制）；schemas.py 增 5 个克隆模型；httpx 升入主依赖；前端 ClonePanel（上传/参考文本/合成/删除，产物回流试听导出）；修复 httpx 默认信任系统代理导致回环调用被劫持的问题（trust_env=False）；pytest 50 → 59 项全过，ruff 通过，前端 build 通过 | zahiko |
+| 2026-10-17 | 修复立体声下 不变调变速(tempo_ola)/淡入淡出(fade) 调用 500：OLA 抽出 `_ola_channel` 逐通道处理后 stack；fade 的 ramp 按 (-1,1) reshape 广播；新增回归测试 3 项 | zahiko |
+| 2026-10-17 | 3.3 语音加噪与降噪改制为独立子服务（ADR 0008）：新建仓库外项目 `noise-service`（独立 git + 独立 venv，端口 9910，封装 n1.py 谱减法：可调 SNR 加噪[白/粉/布朗] + 谱减降噪 + SNR 评估，立体声逐通道，测试 29 项）；主干新增 `server/noise_provider.py`（NoiseProvider ABC + LocalAdapterProvider，trust_env=False）与 `api/routers/noise.py`（/api/noise/status\|operations\|process\|snr，process 产物带血统入库），schemas.py 增 5 个 noise 模型；移除效果器注册表原 denoise（文件/注册/测试/smoke 引用）；实测闭环验证 SNR 5.0 → 13.5 dB、立体声声道保留；pytest 88 → 101 项全过，ruff 与冒烟通过；前端面板留待后续 | zahiko |

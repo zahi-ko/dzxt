@@ -39,10 +39,12 @@
 | - /api/audio            |  HTTP | - Python 3.11 独立 venv   |
 | - /api/effects          |  (待) | - PyTorch + CUDA          |
 | - /api/analysis         |       | - 模型权重走下载脚本      |
-| - /api/health           |       +--------------------------+
-| - GET /  (托管 web/dist)|
-+-----------+-------------+
-            |
+| - /api/clone            |       +--------------------------+
+| - /api/noise            |       +--------------------------+
+| - /api/health           | <---> | noise-service (9910)       |
+| - GET /  (托管 web/dist)|  HTTP | - 仓库外独立 git + venv    |
++-----------+-------------+       | - 加噪/谱减/SNR，无状态    |
+            |                     +--------------------------+
             ▼
 +-------------------------+
 | SessionStore（内存）    |  audio_id → np.ndarray[float32] + sr
@@ -84,6 +86,7 @@ web/ (Vue 3 + TS + Vite)
                 ▼
 packaging/app.{py,spec} + scripts/build_release.ps1   PyInstaller onedir 流水线
 services/clone/* (README 占位)             GPT-SoVITS 子服务，独立 venv（待实现）
+noise-service/（仓库外独立项目）           加噪降噪子服务，独立 git/venv（ADR 0008）
 ```
 
 ---
@@ -106,6 +109,7 @@ services/clone/* (README 占位)             GPT-SoVITS 子服务，独立 venv�
 | `web/src/App.vue` | 全局状态中枢：选中音频、`peaks` / `spectrum` / `stats`、错误提示、在线状态 | **不要**在此放组件级 UI 状态 |
 | `web/src/components/*` | 单一职责子组件，通过 `emit` 与 App 通信 | **不要**直接调 `fetch`；**不要**重复 `request<T>` 的错误处理（统一在 App） |
 | `services/clone/` | GPT-SoVITS 子服务，独立 venv | **不要**导入主干代码；通过 HTTP 通信 |
+| `noise-service/`（仓库外） | 加噪降噪子服务，独立 git + 独立 venv，端口 9910 | **不要**导入主干代码；通过 HTTP 通信；主干侧唯一耦合是 `server/noise_provider.py` + `/api/noise` 路由 |
 | `packaging/` | PyInstaller 配置与打包入口 | **不要**在此写开发期逻辑 |
 | `scripts/build_release.ps1` | 一键打包流水线 | 不要在开发期手动跑 |
 | `docs/` | AGENT / PLAN / ADR / 每次 session 收工日志 | ADR 编号递增，不要覆盖 |
@@ -415,12 +419,38 @@ components/*      ← api（emit 与 props）
 
 ### 7.3 语音加噪与降噪（PLAN 3.3）
 
+> 2026-10-17 改制：由「效果器注册表内实现」改为「独立子服务」（ADR 0008）。
+> 原计划的 `noise_add` / `noise_reduce` 效果器不再采用；阶段二的 `denoise`
+> 效果器已移除，谱减能力由子服务承载。
+
 - 范围：可调 SNR 的加噪 + 谱减法降噪；闭环验证（加噪 → 降噪 → 信噪比对比）。
-- 接入位置（**严格走效果器铁律三**）：
-  - `server/core/effects/noise_add.py`：`@register_effect(name="noise_add", title="加噪", ...)`；`NoiseAddParams{snr_db ∈ [-10, 40], noise_type ∈ ["white", ...]}`。
-  - `server/core/effects/noise_reduce.py`：`@register_effect(name="noise_reduce", title="谱减法降噪", ...)`；参数含谱减系数、过减因子、噪声估计帧等。
-  - 闭环验证脚本：`scripts/snr_loopback.py` 或 `tests/test_snr_loopback.py` —— 加噪 → 计算 SNR → 降噪 → 再算 SNR，断言「降噪后 SNR 显著高于加噪后」。
-- SNR 计算可作为 `server/core/analysis/spectrum.py` 的扩展 `signal_to_noise_ratio(clean, noisy)`。
+- 架构（对齐 ADR 0004 克隆子服务模式）：
+
+  ```
+  主干 FastAPI(8000) ──HTTP──▶ noise-service(9910)     无状态、不落盘、不含模型
+       NoiseProvider            谱减/加噪纯函数（n1.py 封装）
+  ```
+
+- **子服务**：`C:\Users\zahi\Desktop\noise-service`（仓库外独立项目，独立 git +
+  独立 venv，Python 3.11）。端点 `/health`、`/operations`、`/add-noise`、
+  `/denoise`、`/snr`；入参 Pydantic 校验（422），音频仅支持 libsndfile 可读格式；
+  立体声逐通道处理、声道数保留。算法与默认值见服务 README。
+- **主干侧**（本仓库）：
+  - `server/noise_provider.py`：`NoiseProvider` ABC + `LocalAdapterProvider`
+    （`NOISE_SERVICE_URL`，默认 9910；`trust_env=False` 防代理劫持回环；
+    网络异常收敛为 `ProviderError`，路由层映射 503）。
+  - `server/api/routers/noise.py`：`GET /api/noise/status`（离线返回 200 +
+    `online=false`）、`GET /api/noise/operations`（操作与参数 Schema，前端动态
+    表单依据）、`POST /api/noise/process`（`{audio_id, operation, params}`，
+    产物带血统 `source_id`/`steps` 入库，可撤销、可 A/B 对比）、
+    `POST /api/noise/snr`（`{clean_id, noisy_id}` → 实际 SNR，闭环验证）。
+  - 契约：`server/schemas.py` noise 五个模型（**全组同步**），与子服务
+    `app/schemas.py` 互为镜像。
+- **闭环验证**：同一音频 加噪 → 降噪，对「原始 vs 加噪」「原始 vs 降噪」各调
+  一次 `/api/noise/snr`；子服务单测覆盖三种噪声的 SNR 命中与降噪提升
+  （实测 5 dB 白噪输入下降噪后提升约 8.5 dB）。
+- 前端：App 底部「加噪降噪」开发中卡片后续按 `/api/noise/*` 开发面板
+  （操作选择 + 动态参数表单 + 回流试听 + SNR 对比）。
 
 ---
 
