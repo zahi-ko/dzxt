@@ -41,10 +41,11 @@
 | - /api/analysis         |       | - 模型权重走下载脚本      |
 | - /api/clone            |       +--------------------------+
 | - /api/noise            |       +--------------------------+
-| - /api/health           | <---> | noise-service (9910)       |
-| - GET /  (托管 web/dist)|  HTTP | - 仓库外独立 git + venv    |
-+-----------+-------------+       | - 加噪/谱减/SNR，无状态    |
-            |                     +--------------------------+
+| - /api/health           | <---> | services/noise (9910)     |
+| - GET /  (托管 web/dist)|  HTTP | - 仓库内独立 venv         |
+|                         |       | - 加噪/谱减/SNR，无状态    |
++-----------+-------------+       +--------------------------+
+            |
             ▼
 +-------------------------+
 | SessionStore（内存）    |  audio_id → np.ndarray[float32] + sr
@@ -427,12 +428,13 @@ components/*      ← api（emit 与 props）
 - 架构（对齐 ADR 0004 克隆子服务模式）：
 
   ```
-  主干 FastAPI(8000) ──HTTP──▶ noise-service(9910)     无状态、不落盘、不含模型
+  主干 FastAPI(8000) ──HTTP──▶ services/noise(9910)    无状态、不落盘、不含模型
        NoiseProvider            谱减/加噪纯函数（n1.py 封装）
   ```
 
-- **子服务**：`C:\Users\zahi\Desktop\noise-service`（仓库外独立项目，独立 git +
-  独立 venv，Python 3.11）。端点 `/health`、`/operations`、`/add-noise`、
+- **子服务**：`services/noise`（仓库内，与 `services/clone` 同模式：独立 venv，
+  Python 3.11，源码随 dzxt git；2026-10-18 由仓库外独立项目迁入，ADR 0008 修订）。
+  端点 `/health`、`/operations`、`/add-noise`、
   `/denoise`、`/snr`；入参 Pydantic 校验（422），音频仅支持 libsndfile 可读格式；
   立体声逐通道处理、声道数保留。算法与默认值见服务 README。
 - **主干侧**（本仓库）：

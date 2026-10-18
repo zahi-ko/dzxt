@@ -64,9 +64,10 @@ api_v2.py 端口 9880），适配层为轻量 FastAPI（端口 9900，独立 ven
 主干经 `TTSProvider` 抽象层以 HTTP 对接。详见 `docs/adr/0004-voice-clone-local.md`
 （含 2026-09-08 实施修订）。
 
-**语音加噪与降噪子服务**（`noise-service/`，**仓库外独立项目**，端口 9910）：
-谱减法加噪/降噪的无状态 FastAPI 服务（独立 git、独立 venv，Python 3.11），
-主干经 `NoiseProvider` 抽象层以 HTTP 对接。详见 `docs/adr/0008-noise-standalone-service.md`。
+**语音加噪与降噪子服务**（`services/noise/`，端口 9910）：
+谱减法加噪/降噪的无状态 FastAPI 服务（独立 venv，Python 3.11；源码随 dzxt
+git，与 `services/clone` 同组织模式），主干经 `NoiseProvider` 抽象层以 HTTP
+对接。详见 `docs/adr/0008-noise-standalone-service.md`（含 2026-10-18 位置修订）。
 
 ---
 
@@ -119,13 +120,13 @@ cd C:\Users\zahi\Desktop\dzxt\services\clone
 
 ### 3.5 语音加噪与降噪子服务（3.3，拓展功能）
 
-**仓库外独立项目**：`C:\Users\zahi\Desktop\noise-service`（独立 git + 独立 venv，
-按 ADR 0008 不与本项目共享 git）。无状态、不落盘、不含模型；离线时主干仅失去
-加噪/降噪能力，基础功能不受影响。
+**仓库内子服务**：`services\noise`（与 `services\clone` 同模式：独立 venv、
+源码随 dzxt git；2026-10-18 由仓库外独立项目迁入，ADR 0008 修订）。
+无状态、不落盘、不含模型；离线时主干仅失去加噪/降噪能力，基础功能不受影响。
 
 ```powershell
 # 终端 · 加噪降噪子服务（默认 127.0.0.1:9910）
-cd C:\Users\zahi\Desktop\noise-service
+cd C:\Users\zahi\Desktop\dzxt\services\noise
 .venv\Scripts\python.exe main.py
 ```
 
@@ -222,7 +223,8 @@ dzxt/
 │       └── components/   采集 / 列表 / 播放器 / 波形 / 频谱 / 语谱图 / 效果与历史
 │
 ├── services/
-│   └── clone/            语音克隆子服务，独立环境（待实现）
+│   ├── clone/            语音克隆子服务，独立环境
+│   └── noise/            语音加噪与降噪子服务，独立 venv（ADR 0008）
 │
 ├── docs/
 │   ├── adr/              架构决策记录
@@ -247,6 +249,7 @@ dzxt/
 | `server/api/` | 待分配 | 路由层 |
 | `web/` | 待分配 | Vue 前端 |
 | `services/clone/` | 待分配 | 独立环境，门槛最高 |
+| `services/noise/` | 待分配 | 独立 venv，轻量无状态服务 |
 | `docs/` | 组长 | 文档与决策记录 |
 
 > 分工确定后直接改这张表。
@@ -350,7 +353,7 @@ uv run python scripts/smoke.py   # 端到端冒烟：采集→显示→处理→
 - [x] 阶段二功能开发（2026-09-07）：采集（设备/声道/WS 电平/定时停止）、显示（波形缩放选区/频谱/语谱图/信息卡）、处理（淡入淡出/谱减降噪/效果链/历史撤销/A-B 对比）、播放（流端点 + 播放器条），测试 46 项 + 冒烟脚本
 - [x] 运行期问题排查 5 项（2026-09-07，见变更日志最新行）：空 src 误报 / 流端点 Range 缺失导致 seek 失效 / 多次录音同名 / mp3 尾部解码失败 / vite 代理端口硬编码；测试 46 → 49 项，提交 `327d1f5`
 - [x] 3.1 语音克隆环境与链路（2026-09-08）：GPT-SoVITS 整合包引擎就位（v2 + CUDA + fp16，api_v2 端口 9880）；`services/clone` 轻量适配层（独立 venv 无 torch，参考音频托管 + 合成转发，端口 9900）；主干 `TTSProvider` 抽象（含云端插槽）与 `/api/clone/*` 路由（合成产物直接入库句柄制）；前端 `ClonePanel`（参考音上传/管理、参考文本、合成、回流试听导出）；子服务离线 503 降级不拖垮基础功能；实测修复 httpx 系统代理劫持回环调用的坑（trust_env=False）；测试 50 → 59 项
-- [x] 3.3 语音加噪与降噪 · 服务与主干接口（2026-10-17，ADR 0008）：独立子服务 `noise-service`（仓库外，独立 git/venv，端口 9910，无状态 FastAPI，封装 n1.py 谱减法：可调 SNR 加噪[白/粉/布朗] + 谱减降噪 + SNR 评估，立体声逐通道）；主干 `NoiseProvider` 抽象 + `/api/noise/status|operations|process|snr`（process 产物带血统入库可撤销）；移除效果器注册表原 `denoise`；实测闭环 5.0 → 13.5 dB；测试 88 → 101 项。**遗留**：前端「加噪降噪」卡片仍为开发中占位，待按 `/api/noise/*` 开发面板
+- [x] 3.3 语音加噪与降噪 · 服务与主干接口（2026-10-17，ADR 0008）：子服务 `services/noise`（仓库内，独立 venv，端口 9910，无状态 FastAPI，封装 n1.py 谱减法：可调 SNR 加噪[白/粉/布朗] + 谱减降噪 + SNR 评估，立体声逐通道；2026-10-18 由仓库外独立项目迁入）；主干 `NoiseProvider` 抽象 + `/api/noise/status|operations|process|snr`（process 产物带血统入库可撤销）；移除效果器注册表原 `denoise`；实测闭环 5.0 → 13.5 dB；测试 88 → 101 项。**遗留**：前端「加噪降噪」卡片仍为开发中占位，待按 `/api/noise/*` 开发面板
 - [ ] 阶段三拓展功能（3.1 语音克隆 / 3.2 录音质量检测 / 3.3 语音加噪与降噪）
 
 ### 阶段二补充约定
@@ -399,3 +402,4 @@ uv run python scripts/smoke.py   # 端到端冒烟：采集→显示→处理→
 | 2026-09-08 | 3.1 语音克隆环境与全链路：引擎采用官方整合包（`C:\Users\zahi\.venvs\GPT-SoVITS-v2pro-20250604`，v2+CUDA+fp16，api_v2 端口 9880，ADR 0004 补实施修订——适配层不含 torch）；新增 `services/clone` 适配层（FastAPI 9900，参考音频 2–15s 校验落盘 + JSON 索引持久化 + /tts 转发）；主干新增 `server/tts_provider.py`（TTSProvider ABC + LocalAdapterProvider + 云端插槽）与 `api/routers/clone.py`（/api/clone/status、refs CRUD 代理、synthesize 产物入库句柄制）；schemas.py 增 5 个克隆模型；httpx 升入主依赖；前端 ClonePanel（上传/参考文本/合成/删除，产物回流试听导出）；修复 httpx 默认信任系统代理导致回环调用被劫持的问题（trust_env=False）；pytest 50 → 59 项全过，ruff 通过，前端 build 通过 | zahiko |
 | 2026-10-17 | 修复立体声下 不变调变速(tempo_ola)/淡入淡出(fade) 调用 500：OLA 抽出 `_ola_channel` 逐通道处理后 stack；fade 的 ramp 按 (-1,1) reshape 广播；新增回归测试 3 项 | zahiko |
 | 2026-10-17 | 3.3 语音加噪与降噪改制为独立子服务（ADR 0008）：新建仓库外项目 `noise-service`（独立 git + 独立 venv，端口 9910，封装 n1.py 谱减法：可调 SNR 加噪[白/粉/布朗] + 谱减降噪 + SNR 评估，立体声逐通道，测试 29 项）；主干新增 `server/noise_provider.py`（NoiseProvider ABC + LocalAdapterProvider，trust_env=False）与 `api/routers/noise.py`（/api/noise/status\|operations\|process\|snr，process 产物带血统入库），schemas.py 增 5 个 noise 模型；移除效果器注册表原 denoise（文件/注册/测试/smoke 引用）；实测闭环验证 SNR 5.0 → 13.5 dB、立体声声道保留；pytest 88 → 101 项全过，ruff 与冒烟通过；前端面板留待后续 | zahiko |
+| 2026-10-18 | 3.3 子服务位置修订：`noise-service` 由仓库外独立项目迁入 `services/noise`（用户要求与 clone 同组织模式）——删除独立 git（原仅 1 个本地初始提交，无 remote，工作树内容全保留），源码纳入 dzxt git 管理；独立 venv 保留（重建后 uv run 恢复，迁移后旧 venv 的 script path 缓存失效会报 "Failed to canonicalize script path"）；同步更新 AGENT.md §2/§3.5/目录树/§6/§11、ADR 0008 修订记录、architecture.md §1.1/§7.3、PLAN.md 3.3、服务 README；`server/api/routers/noise.py` 离线提示改指 `services/noise` | zahiko |

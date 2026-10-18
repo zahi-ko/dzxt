@@ -2,11 +2,12 @@
 
 架构（ADR 0008）：
 
-    主干 ──HTTP──▶ noise-service(9910)     无状态、不落盘、不含模型
+    主干 ──HTTP──▶ services/noise(9910)     无状态、不落盘、不含模型
 
-- LocalAdapterProvider：经 HTTP 调用本地 noise-service（当前唯一实现）
-- 独立子服务位于 dzxt 仓库之外（C:\\Users\\zahi\\Desktop\\noise-service），
-  独立 git / 独立 venv，本文件与 server/api/routers/noise.py 是主干侧全部耦合。
+- LocalAdapterProvider：经 HTTP 调用本地加噪降噪子服务（当前唯一实现）
+- 子服务位于 dzxt 仓库内 services/noise/（与 services/clone 同模式：
+  独立 venv、源码随 dzxt git），本文件与 server/api/routers/noise.py
+  是主干侧全部耦合。
 - 所有网络异常统一收敛为 ProviderError，路由层据此返回 503，
   保证子服务离线时只影响加噪/降噪，不拖垮基础功能演示。
 

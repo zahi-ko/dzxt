@@ -284,7 +284,7 @@ class CloneStatusResponse(BaseModel):
 # 语音加噪与降噪（3.3）
 #
 # 算法封装在独立子服务 noise-service（独立 git / 独立 venv，位于本仓库之外），
-# 主干经 NoiseProvider 抽象层以 HTTP 对接。契约镜像 noise-service/app/schemas.py。
+# 主干经 NoiseProvider 抽象层以 HTTP 对接。契约镜像 services/noise/app/schemas.py。
 # 子服务离线时仅失去加噪/降噪能力，基础功能不受影响。
 # ---------------------------------------------------------------------------
 

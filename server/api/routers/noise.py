@@ -30,7 +30,7 @@ from server.session_store import get_store
 router = APIRouter(prefix="/api/noise", tags=["noise"])
 
 # 子服务离线时的统一提示。真实原因在 status/detail 里可查。
-_OFFLINE_HINT = "加噪降噪子服务未就绪，请先启动 noise-service（见 AGENT.md §3.5）"
+_OFFLINE_HINT = "加噪降噪子服务未就绪，请先启动 services/noise（见 AGENT.md §3.5）"
 
 _OPERATION_TITLES = {"add_noise": "加噪", "denoise": "谱减降噪"}
 

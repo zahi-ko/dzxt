@@ -55,3 +55,20 @@
   api.ts 增对应方法（唯一后端耦合点）。
 - 3.2 录音质量检测仍全部未开始（architecture.md §7.2 已有接入方案）。
 - start.bat 可按需追加 noise-service 启动行（当前未加，避免强依赖）。
+
+---
+
+## 【2026-10-18 修订】子服务迁入仓库内 services/noise
+
+用户新指令：「像 clone 一样接入 services」。位置决策修订（ADR 0008 已加修订记录）：
+
+- `C:\Users\zahi\Desktop\noise-service` → `services/noise/`（mv，内容全保留）。
+- 删除独立 `.git`：原仓库仅 1 个本地初始提交（7f75e5b）、无 remote，工作树
+  内容即全部资产；源码自此随 dzxt git 管理（主干一次 commit 覆盖迁移）。
+- 独立 venv 保留但需重建：旧 venv 迁移后 `uv run` 报
+  "Failed to canonicalize script path"（script path 缓存失效），
+  `rm -rf .venv && uv sync` 后恢复；直调 `.venv\Scripts\python.exe -m pytest`
+  在迁移当时仍可用（29 项全过）。
+- 主干侧代码零契约改动（HTTP 接口未变），仅 `routers/noise.py` 离线提示
+  改指 `services/noise`；文档同步：AGENT.md §2/§3.5/目录树/§6/§11/§12、
+  ADR 0008 修订记录、architecture.md §1.1 ASCII 图/§7.3、PLAN.md、服务 README。

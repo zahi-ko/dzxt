@@ -23,6 +23,9 @@ ADR 0006 将「语音加噪与降噪」定为三项必做拓展之一，原计�
 - 新服务 `noise-service`：位于 dzxt 仓库**之外**
   （`C:\Users\zahi\Desktop\noise-service`），**独立 git 仓库 + 独立 venv**
   （Python 3.11），FastAPI 无状态服务，端口 9910。
+  【2026-10-18 修订】迁入 dzxt 仓库内 `services/noise/`，与 `services/clone`
+  同组织模式：独立 venv 保留，独立 git 撤销（源码随 dzxt git 管理），
+  修订理由见文末「修订记录」。
 - 架构对齐克隆子服务先例（ADR 0004 的适配层模式）：
   主干经 `NoiseProvider` 抽象层（`server/noise_provider.py`）以 HTTP 对接，
   子服务离线时主干返回 503 / `online=false`，不拖垮基础功能。
@@ -37,6 +40,10 @@ ADR 0006 将「语音加噪与降噪」定为三项必做拓展之一，原计�
 - **用户明确要求独立 venv + 独立 git**：服务放在仓库内即使加 .gitignore
   也与当前项目共享工作树，嵌套 git 仓库亦是隐患；仓库外独立项目是
   「不与当前项目共享 git」最彻底的履约方式（与克隆引擎位于仓库外同构）。
+  【2026-10-18 修订】用户随后要求「像 clone 一样接入 services」——即接受
+  仓库内共享 git，换取与 `services/clone` 一致的运维模式（单一仓库克隆、
+  统一提交签名、目录内自包含）。独立 venv 的隔离目标不受影响，仍满足
+  「不共享依赖环境」的初衷。
 - **复用克隆子服务验证过的模式**：Provider 抽象 + 离线降级 + trust_env=False，
   路由与前端零侵入；ADR 0004 的「云端插槽」思路同样适用
   （换 Provider 子类即可切换云端实现）。
@@ -55,3 +62,9 @@ ADR 0006 将「语音加噪与降噪」定为三项必做拓展之一，原计�
   本 ADR 不含前端实现。
 - 若未来需要仓库内复现：按 noise-service/README.md 重新创建即可，
   接口契约以主干 schemas.py 与子服务 app/schemas.py 互为镜像为准。
+
+## 修订记录
+
+| 日期 | 修订 |
+|---|---|
+| 2026-10-18 | 位置由仓库外独立项目（`C:\Users\zahi\Desktop\noise-service`，独立 git）迁入仓库内 `services/noise/`：用户要求与 `services/clone` 同组织模式。独立 venv（Python 3.11）保留；独立 git 撤销（原仓库仅 1 个本地初始提交、无 remote，工作树内容全部保留）；`.venv` 重建后 `uv run` 恢复。主干侧代码零改动（HTTP 契约未变），仅离线提示与文档路径更新。 |
