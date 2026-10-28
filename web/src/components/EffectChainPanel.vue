@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { api, schemaToFields } from '../api'
-import type { ApplyEffectResponse, EffectInfo } from '../api'
+import type { ApplyEffectResponse, EffectInfo, ParamValue } from '../api'
 import EffectParamsFields from './EffectParamsFields.vue'
 
 // 效果链：按顺序串起多个效果，一次请求完成，只产出一个新句柄。
@@ -21,8 +21,6 @@ const emit = defineEmits<{
   applied: [result: ApplyEffectResponse]
   error: [message: string]
 }>()
-
-type ParamValue = number | boolean | string
 
 interface ChainStep {
   effect: string

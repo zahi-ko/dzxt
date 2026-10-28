@@ -138,7 +138,7 @@
 - [x] 降噪：谱减法降噪增强（`denoise`：alpha / beta / frame_ms / hop_ms / noise_est_ratio / noise_frames / gain_smooth；原效果器注册表 `denoise` 已移除）
 - [x] 主干对接：`NoiseProvider` 抽象 + `/api/noise/status|operations|process|snr`，process 产物带血统入库（可撤销、可 A/B 对比）
 - [x] 闭环验证：同一音频加噪 → 降噪，`/api/noise/snr` 对比处理前后信噪比（实测 5.0 → 13.5 dB；服务侧单测覆盖三种噪声的 SNR 命中与提升）
-- [ ] 前端「加噪降噪」面板：操作选择 + 参数表单（按 `/api/noise/operations` 动态生成）+ 处理回流试听 + SNR 对比展示（App 底部「开发中」卡片替换）
+- [x] 前端「加噪降噪」面板：操作选择 + 参数表单（按 `/api/noise/operations` 动态生成）+ 处理回流试听 + SNR 对比展示（App 底部「开发中」卡片替换）（2026-10-28：`NoisePanel` + 拓展抽屉；操作标签页、枚举/可空字段动态表单、产物入库自动试听、基线与对比双侧 SNR 测量与历史记录）
 - [ ] 主观听感验证（答辩演示用）
 
 ### 3.4 系统集成

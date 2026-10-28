@@ -9,6 +9,8 @@ import type {
   CloneSynthesizeResponse,
   EffectInfo,
   EffectHistoryResponse,
+  NoiseProcessResponse,
+  NoiseStatusResponse,
   SpectrogramResponse,
   SpectrumResponse,
   WaveformResponse,
@@ -19,6 +21,7 @@ import ClonePanel from './components/ClonePanel.vue'
 import EffectChainPanel from './components/EffectChainPanel.vue'
 import EffectPanel from './components/EffectPanel.vue'
 import HistoryPanel from './components/HistoryPanel.vue'
+import NoisePanel from './components/NoisePanel.vue'
 import PlayerBar from './components/PlayerBar.vue'
 import RecorderCard from './components/RecorderCard.vue'
 import SpectrogramCanvas from './components/SpectrogramCanvas.vue'
@@ -64,8 +67,28 @@ const online = ref(false)
 // 拓展功能：默认收起为卡片，点开才显示完整面板
 const cloneOpen = ref(false)
 const cloneStatus = ref<CloneStatusResponse | null>(null)
+const noiseOpen = ref(false)
+const noiseStatus = ref<NoiseStatusResponse | null>(null)
 // 分析区标签页：频谱 / 语谱图共用一块面板，避免纵向堆叠过长
 const analysisTab = ref<'spectrum' | 'spectrogram'>('spectrum')
+
+type Extension = 'clone' | 'noise'
+
+const drawerTitle = computed(() => {
+  if (cloneOpen.value) return '语音克隆'
+  if (noiseOpen.value) return '语音加噪与降噪'
+  return ''
+})
+
+function openDrawer(extension: Extension) {
+  cloneOpen.value = extension === 'clone'
+  noiseOpen.value = extension === 'noise'
+}
+
+function closeDrawer() {
+  cloneOpen.value = false
+  noiseOpen.value = false
+}
 
 function showError(message: string) {
   errorMessage.value = message
@@ -108,6 +131,14 @@ async function refreshCloneStatus() {
     cloneStatus.value = await api.cloneStatus()
   } catch {
     cloneStatus.value = null
+  }
+}
+
+async function refreshNoiseStatus() {
+  try {
+    noiseStatus.value = await api.noiseStatus()
+  } catch {
+    noiseStatus.value = null
   }
 }
 
@@ -178,6 +209,17 @@ async function handleCloned(result: CloneSynthesizeResponse) {
   await handleRecorded(result.meta)
 }
 
+// 加噪降噪产物：刷新列表 → 选中 → 直接试听；抽屉保持打开，
+// 便于紧接着做 SNR 闭环对比（面板内部已自动填好基线与对比侧）。
+async function handleNoiseApplied(result: NoiseProcessResponse) {
+  try {
+    await refreshAudios()
+    await playFromLibrary(result.audio_id)
+  } catch (error) {
+    showError((error as Error).message)
+  }
+}
+
 async function handleApplied(result: ApplyEffectResponse) {
   try {
     await refreshAudios()
@@ -210,6 +252,12 @@ const cloneBadge = computed(() => {
   return { text: '离线', cls: 'off' }
 })
 
+const noiseBadge = computed(() => {
+  const status = noiseStatus.value
+  if (!status) return { text: '未检测', cls: 'off' }
+  return status.online ? { text: '在线', cls: 'on' } : { text: '离线', cls: 'off' }
+})
+
 onMounted(async () => {
   try {
     await api.health()
@@ -226,6 +274,7 @@ onMounted(async () => {
   }
 
   refreshCloneStatus()
+  refreshNoiseStatus()
 })
 </script>
 
@@ -357,7 +406,7 @@ onMounted(async () => {
     <section class="extensions">
       <h2 class="section-title">拓展功能</h2>
       <div class="ext-grid">
-        <button class="ext-card" @click="cloneOpen = true">
+        <button class="ext-card" @click="openDrawer('clone')">
           <span class="ext-no" aria-hidden="true">01</span>
           <span class="ext-body">
             <span class="ext-name">语音克隆</span>
@@ -375,28 +424,35 @@ onMounted(async () => {
           <span class="ext-badge todo">开发中</span>
         </button>
 
-        <button class="ext-card" disabled title="阶段三待开发">
+        <button class="ext-card" @click="openDrawer('noise')">
           <span class="ext-no" aria-hidden="true">03</span>
           <span class="ext-body">
             <span class="ext-name">语音加噪与降噪</span>
             <span class="ext-desc">可调信噪比的闭环验证</span>
           </span>
-          <span class="ext-badge todo">开发中</span>
+          <span class="ext-badge" :class="noiseBadge.cls">{{ noiseBadge.text }}</span>
         </button>
       </div>
     </section>
 
-    <!-- 语音克隆抽屉 -->
+    <!-- 拓展功能抽屉：克隆与加噪降噪共用一套外壳，标题随打开项切换 -->
     <transition name="drawer">
-      <div v-if="cloneOpen" class="drawer-layer">
-        <div class="drawer-mask" @click="cloneOpen = false"></div>
-        <aside class="drawer" role="dialog" aria-label="语音克隆">
+      <div v-if="cloneOpen || noiseOpen" class="drawer-layer">
+        <div class="drawer-mask" @click="closeDrawer"></div>
+        <aside class="drawer" role="dialog" :aria-label="drawerTitle">
           <header class="drawer-head">
-            <h2>语音克隆</h2>
-            <button class="mini" aria-label="关闭" @click="cloneOpen = false">✕</button>
+            <h2>{{ drawerTitle }}</h2>
+            <button class="mini" aria-label="关闭" @click="closeDrawer">✕</button>
           </header>
           <div class="drawer-body">
-            <ClonePanel @applied="handleCloned" @error="showError" />
+            <ClonePanel v-if="cloneOpen" @applied="handleCloned" @error="showError" />
+            <NoisePanel
+              v-else
+              :audio-id="selectedId"
+              :items="audios"
+              @applied="handleNoiseApplied"
+              @error="showError"
+            />
           </div>
         </aside>
       </div>

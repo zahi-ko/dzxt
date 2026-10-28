@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { api, schemaToFields } from '../api'
-import type { ApplyEffectResponse, EffectInfo, FormField } from '../api'
+import type { ApplyEffectResponse, EffectInfo, FormField, ParamValue } from '../api'
 import EffectParamsFields from './EffectParamsFields.vue'
 
 // 这个面板没有任何硬编码的效果名。
@@ -22,8 +22,6 @@ const emit = defineEmits<{
   applied: [result: ApplyEffectResponse]
   error: [message: string]
 }>()
-
-type ParamValue = number | boolean | string
 
 const selectedName = ref('')
 const params = ref<Record<string, ParamValue>>({})

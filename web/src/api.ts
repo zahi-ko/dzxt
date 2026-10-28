@@ -152,6 +152,32 @@ export interface CloneSynthesizeResponse {
   text: string
 }
 
+export interface NoiseStatusResponse {
+  online: boolean
+  detail: string
+}
+
+export interface NoiseOperationInfo {
+  name: string
+  title: string
+  description: string
+  params_schema: Record<string, unknown>
+}
+
+export interface NoiseOperationListResponse {
+  items: NoiseOperationInfo[]
+}
+
+export interface NoiseProcessResponse {
+  audio_id: string
+  meta: AudioMeta
+  operation: string
+}
+
+export interface NoiseSnrResponse {
+  snr_db: number
+}
+
 // ---------- 请求基础设施 ----------
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -342,6 +368,21 @@ export const api = {
       repetition_penalty: options.repetitionPenalty ?? 1.35,
       seed: options.seed ?? -1,
     }),
+
+  noiseStatus: () => request<NoiseStatusResponse>('/noise/status'),
+  noiseOperations: () => request<NoiseOperationListResponse>('/noise/operations'),
+  noiseProcess: (options: {
+    audioId: string
+    operation: string
+    params: Record<string, ParamValue>
+  }) =>
+    post<NoiseProcessResponse>('/noise/process', {
+      audio_id: options.audioId,
+      operation: options.operation,
+      params: options.params,
+    }),
+  noiseSnr: (cleanId: string, noisyId: string) =>
+    post<NoiseSnrResponse>('/noise/snr', { clean_id: cleanId, noisy_id: noisyId }),
 }
 
 // ---------- JSON Schema → 表单字段 ----------
@@ -350,31 +391,61 @@ interface SchemaProperty {
   type?: string
   title?: string
   description?: string
-  default?: number | boolean | string
+  default?: number | boolean | string | null
   minimum?: number
   maximum?: number
+  enum?: string[]
+  anyOf?: { type?: string }[]
 }
+
+/** 表单字段值。null 表示「留空」——后端可空参数（如 noise_frames / seed）用它表达缺省。 */
+export type ParamValue = number | boolean | string | null
 
 export interface FormField {
   key: string
   label: string
   description: string
+  /** number / integer / boolean / string */
   type: string
-  value: number | boolean | string | undefined
+  value: ParamValue | undefined
   min?: number
   max?: number
+  /** 枚举取值：有值时渲染为下拉框 */
+  options?: string[]
+  /** 允许留空（Schema 里是 `X | None`） */
+  nullable?: boolean
+}
+
+// 枚举取值的展示文案（仅影响 UI；未登记的值原样显示，新操作无需改前端）
+const ENUM_LABELS: Record<string, string> = {
+  white: '白噪声 white',
+  pink: '粉噪声 pink',
+  brown: '布朗噪声 brown',
+}
+
+export function enumLabel(value: string): string {
+  return ENUM_LABELS[value] ?? value
 }
 
 // 把后端下发的 JSON Schema 转成可渲染的表单字段描述
 export function schemaToFields(schema: Record<string, unknown>): FormField[] {
   const properties = (schema.properties as Record<string, SchemaProperty> | undefined) ?? {}
-  return Object.entries(properties).map(([key, spec]) => ({
-    key,
-    label: spec.title || key,
-    description: spec.description || '',
-    type: spec.type || 'number',
-    value: spec.default,
-    min: spec.minimum,
-    max: spec.maximum,
-  }))
+  return Object.entries(properties).map(([key, spec]) => {
+    // Pydantic v2 把 `X | None` 编成 anyOf: [{type: X}, {type: 'null'}]
+    const variants = (spec.anyOf ?? [])
+      .map((item) => item.type)
+      .filter((item): item is string => typeof item === 'string')
+    const nullable = variants.includes('null')
+    return {
+      key,
+      label: spec.title || key,
+      description: spec.description || '',
+      type: spec.type ?? variants.find((item) => item !== 'null') ?? 'number',
+      value: spec.default ?? undefined,
+      min: spec.minimum,
+      max: spec.maximum,
+      options: spec.enum,
+      nullable,
+    }
+  })
 }
